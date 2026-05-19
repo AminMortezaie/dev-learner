@@ -5,6 +5,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Layout } from "@/components/layout";
 import NotFound from "@/pages/not-found";
+import { setBaseUrl } from "@workspace/api-client-react";
+
+// In production (GitHub Pages), point API calls at the deployed Render backend.
+// In dev, Vite's proxy handles /api/* so no base URL is needed.
+if (import.meta.env.PROD && import.meta.env.VITE_API_URL) {
+  setBaseUrl(import.meta.env.VITE_API_URL as string);
+}
 
 // Pages placeholder
 import Dashboard from "@/pages/dashboard";
