@@ -1,84 +1,87 @@
-import { Router, type IRouter } from "express";
-import { db, topicsTable, languagesTable } from "@workspace/db";
-import { eq, and, type SQL } from "drizzle-orm";
+import { Router } from "express";
+import { and, eq } from "drizzle-orm";
 import {
-  ListTopicsQueryParams,
-  CreateTopicBody,
-  GetTopicParams,
-} from "@workspace/api-zod";
+  db,
+  topicsTable,
+  languagesTable,
+  insertTopicSchema,
+} from "@workspace/db";
+import { asyncHandler } from "../lib/async.ts";
+import { HttpError } from "../lib/errors.ts";
+import { parseIntParam, parseOptionalInt, parseOptionalString } from "../lib/parse.ts";
 
-const router: IRouter = Router();
+export const topicsRouter = Router();
 
-router.get("/topics", async (req, res): Promise<void> => {
-  const query = ListTopicsQueryParams.safeParse(req.query);
-  if (!query.success) {
-    res.status(400).json({ error: query.error.message });
-    return;
-  }
+topicsRouter.get(
+  "/topics",
+  asyncHandler(async (req, res) => {
+    const languageId = parseOptionalInt(req.query.languageId);
+    const difficulty = parseOptionalString(req.query.difficulty);
 
-  const conditions: SQL[] = [];
-  if (query.data.languageId) conditions.push(eq(topicsTable.languageId, query.data.languageId));
-  if (query.data.difficulty) conditions.push(eq(topicsTable.difficulty, query.data.difficulty));
+    const where = [];
+    if (languageId !== undefined) where.push(eq(topicsTable.languageId, languageId));
+    if (difficulty) where.push(eq(topicsTable.difficulty, difficulty));
 
-  const topics = await db
-    .select({
-      id: topicsTable.id,
-      languageId: topicsTable.languageId,
-      languageName: languagesTable.name,
-      title: topicsTable.title,
-      description: topicsTable.description,
-      difficulty: topicsTable.difficulty,
-      category: topicsTable.category,
-      createdAt: topicsTable.createdAt,
-    })
-    .from(topicsTable)
-    .leftJoin(languagesTable, eq(topicsTable.languageId, languagesTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(topicsTable.id);
+    const rows = await db
+      .select({
+        id: topicsTable.id,
+        languageId: topicsTable.languageId,
+        title: topicsTable.title,
+        description: topicsTable.description,
+        difficulty: topicsTable.difficulty,
+        category: topicsTable.category,
+        createdAt: topicsTable.createdAt,
+        languageName: languagesTable.name,
+      })
+      .from(topicsTable)
+      .leftJoin(languagesTable, eq(languagesTable.id, topicsTable.languageId))
+      .where(where.length ? and(...where) : undefined)
+      .orderBy(topicsTable.id);
 
-  res.json(topics);
-});
+    res.json(
+      rows.map((r) => ({
+        ...r,
+        createdAt: r.createdAt ? r.createdAt.toISOString() : null,
+      })),
+    );
+  }),
+);
 
-router.post("/topics", async (req, res): Promise<void> => {
-  const parsed = CreateTopicBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+topicsRouter.post(
+  "/topics",
+  asyncHandler(async (req, res) => {
+    const input = insertTopicSchema.parse(req.body);
+    const [created] = await db.insert(topicsTable).values(input).returning();
+    if (!created) throw new HttpError(500, "Failed to create topic");
+    res.status(201).json({
+      ...created,
+      createdAt: created.createdAt ? created.createdAt.toISOString() : null,
+    });
+  }),
+);
 
-  const [topic] = await db.insert(topicsTable).values(parsed.data).returning();
-  res.status(201).json(topic);
-});
-
-router.get("/topics/:id", async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetTopicParams.safeParse({ id: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const [topic] = await db
-    .select({
-      id: topicsTable.id,
-      languageId: topicsTable.languageId,
-      languageName: languagesTable.name,
-      title: topicsTable.title,
-      description: topicsTable.description,
-      difficulty: topicsTable.difficulty,
-      category: topicsTable.category,
-      createdAt: topicsTable.createdAt,
-    })
-    .from(topicsTable)
-    .leftJoin(languagesTable, eq(topicsTable.languageId, languagesTable.id))
-    .where(eq(topicsTable.id, params.data.id));
-
-  if (!topic) {
-    res.status(404).json({ error: "Topic not found" });
-    return;
-  }
-
-  res.json(topic);
-});
-
-export default router;
+topicsRouter.get(
+  "/topics/:id",
+  asyncHandler(async (req, res) => {
+    const id = parseIntParam(req.params.id, "id");
+    const [row] = await db
+      .select({
+        id: topicsTable.id,
+        languageId: topicsTable.languageId,
+        title: topicsTable.title,
+        description: topicsTable.description,
+        difficulty: topicsTable.difficulty,
+        category: topicsTable.category,
+        createdAt: topicsTable.createdAt,
+        languageName: languagesTable.name,
+      })
+      .from(topicsTable)
+      .leftJoin(languagesTable, eq(languagesTable.id, topicsTable.languageId))
+      .where(eq(topicsTable.id, id));
+    if (!row) throw new HttpError(404, "Topic not found");
+    res.json({
+      ...row,
+      createdAt: row.createdAt ? row.createdAt.toISOString() : null,
+    });
+  }),
+);

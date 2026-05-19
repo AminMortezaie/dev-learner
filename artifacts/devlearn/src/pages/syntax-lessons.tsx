@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { useParams } from "wouter";
-import { useListLanguages, useListSyntaxLessons } from "@workspace/api-client-react";
+import {
+  useListLanguages,
+  useListSyntaxLessons,
+  getListSyntaxLessonsQueryKey,
+} from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Github, Code2, BookOpen } from "lucide-react";
+import { CodeBlock } from "@/components/code-block";
 
 export default function SyntaxLessons() {
   const { languageSlug } = useParams<{ languageSlug: string }>();
@@ -13,9 +18,10 @@ export default function SyntaxLessons() {
   const language = languages?.find(l => l.slug === languageSlug);
   const langId = language?.id;
 
+  const lessonsParams = { languageId: langId };
   const { data: lessons, isLoading } = useListSyntaxLessons(
-    { languageId: langId }, 
-    { query: { enabled: !!langId } }
+    lessonsParams,
+    { query: { queryKey: getListSyntaxLessonsQueryKey(lessonsParams), enabled: !!langId } },
   );
 
   if (langsLoading) {
@@ -99,9 +105,9 @@ export default function SyntaxLessons() {
                             <div className="px-4 py-2 border-b border-border/50 bg-black/40 text-xs font-mono text-muted-foreground">
                               SYNTAX
                             </div>
-                            <pre className="p-4 bg-black/80 text-sm font-mono overflow-x-auto m-0 text-primary-foreground h-full min-h-[120px]">
-                              <code>{lesson.rawSyntax}</code>
-                            </pre>
+                            <div className="min-h-[120px]">
+                              <CodeBlock code={lesson.rawSyntax} language={languageSlug} label="SYNTAX" />
+                            </div>
                           </div>
                         )}
                         
@@ -115,9 +121,9 @@ export default function SyntaxLessons() {
                                 </a>
                               )}
                             </div>
-                            <pre className="p-4 bg-black/60 text-sm font-mono overflow-x-auto m-0 text-muted-foreground h-full min-h-[120px]">
-                              <code>{lesson.realWorldExample}</code>
-                            </pre>
+                            <div className="min-h-[120px]">
+                              <CodeBlock code={lesson.realWorldExample} language={languageSlug} label="REAL WORLD EXAMPLE" />
+                            </div>
                           </div>
                         )}
                       </div>

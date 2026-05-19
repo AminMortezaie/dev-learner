@@ -1,83 +1,65 @@
-import { Router, type IRouter } from "express";
-import { db, syntaxLessonsTable, languagesTable } from "@workspace/db";
-import { eq, and, type SQL } from "drizzle-orm";
+import { Router } from "express";
+import { and, eq } from "drizzle-orm";
 import {
-  ListSyntaxLessonsQueryParams,
-  GetSyntaxLessonParams,
-} from "@workspace/api-zod";
+  db,
+  syntaxLessonsTable,
+  languagesTable,
+} from "@workspace/db";
+import { asyncHandler } from "../lib/async.ts";
+import { HttpError } from "../lib/errors.ts";
+import { parseIntParam, parseOptionalInt, parseOptionalString } from "../lib/parse.ts";
 
-const router: IRouter = Router();
+export const syntaxRouter = Router();
 
-router.get("/syntax-lessons", async (req, res): Promise<void> => {
-  const query = ListSyntaxLessonsQueryParams.safeParse(req.query);
-  if (!query.success) {
-    res.status(400).json({ error: query.error.message });
-    return;
-  }
+const syntaxSelect = {
+  id: syntaxLessonsTable.id,
+  languageId: syntaxLessonsTable.languageId,
+  title: syntaxLessonsTable.title,
+  concept: syntaxLessonsTable.concept,
+  rawSyntax: syntaxLessonsTable.rawSyntax,
+  explanation: syntaxLessonsTable.explanation,
+  realWorldExample: syntaxLessonsTable.realWorldExample,
+  githubProject: syntaxLessonsTable.githubProject,
+  githubUrl: syntaxLessonsTable.githubUrl,
+  difficulty: syntaxLessonsTable.difficulty,
+  category: syntaxLessonsTable.category,
+  orderIndex: syntaxLessonsTable.orderIndex,
+  languageName: languagesTable.name,
+};
 
-  const conditions: SQL[] = [];
-  if (query.data.languageId) conditions.push(eq(syntaxLessonsTable.languageId, query.data.languageId));
-  if (query.data.difficulty) conditions.push(eq(syntaxLessonsTable.difficulty, query.data.difficulty));
-  if (query.data.category) conditions.push(eq(syntaxLessonsTable.category, query.data.category));
+syntaxRouter.get(
+  "/syntax-lessons",
+  asyncHandler(async (req, res) => {
+    const languageId = parseOptionalInt(req.query.languageId);
+    const difficulty = parseOptionalString(req.query.difficulty);
+    const category = parseOptionalString(req.query.category);
 
-  const lessons = await db
-    .select({
-      id: syntaxLessonsTable.id,
-      languageId: syntaxLessonsTable.languageId,
-      languageName: languagesTable.name,
-      title: syntaxLessonsTable.title,
-      concept: syntaxLessonsTable.concept,
-      rawSyntax: syntaxLessonsTable.rawSyntax,
-      explanation: syntaxLessonsTable.explanation,
-      realWorldExample: syntaxLessonsTable.realWorldExample,
-      githubProject: syntaxLessonsTable.githubProject,
-      githubUrl: syntaxLessonsTable.githubUrl,
-      difficulty: syntaxLessonsTable.difficulty,
-      category: syntaxLessonsTable.category,
-      orderIndex: syntaxLessonsTable.orderIndex,
-    })
-    .from(syntaxLessonsTable)
-    .leftJoin(languagesTable, eq(syntaxLessonsTable.languageId, languagesTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(syntaxLessonsTable.orderIndex);
+    const where = [];
+    if (languageId !== undefined) where.push(eq(syntaxLessonsTable.languageId, languageId));
+    if (difficulty) where.push(eq(syntaxLessonsTable.difficulty, difficulty));
+    if (category) where.push(eq(syntaxLessonsTable.category, category));
 
-  res.json(lessons);
-});
+    const rows = await db
+      .select(syntaxSelect)
+      .from(syntaxLessonsTable)
+      .leftJoin(languagesTable, eq(languagesTable.id, syntaxLessonsTable.languageId))
+      .where(where.length ? and(...where) : undefined)
+      .orderBy(syntaxLessonsTable.orderIndex, syntaxLessonsTable.id);
 
-router.get("/syntax-lessons/:id", async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetSyntaxLessonParams.safeParse({ id: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+    res.json(rows);
+  }),
+);
 
-  const [lesson] = await db
-    .select({
-      id: syntaxLessonsTable.id,
-      languageId: syntaxLessonsTable.languageId,
-      languageName: languagesTable.name,
-      title: syntaxLessonsTable.title,
-      concept: syntaxLessonsTable.concept,
-      rawSyntax: syntaxLessonsTable.rawSyntax,
-      explanation: syntaxLessonsTable.explanation,
-      realWorldExample: syntaxLessonsTable.realWorldExample,
-      githubProject: syntaxLessonsTable.githubProject,
-      githubUrl: syntaxLessonsTable.githubUrl,
-      difficulty: syntaxLessonsTable.difficulty,
-      category: syntaxLessonsTable.category,
-      orderIndex: syntaxLessonsTable.orderIndex,
-    })
-    .from(syntaxLessonsTable)
-    .leftJoin(languagesTable, eq(syntaxLessonsTable.languageId, languagesTable.id))
-    .where(eq(syntaxLessonsTable.id, params.data.id));
-
-  if (!lesson) {
-    res.status(404).json({ error: "Syntax lesson not found" });
-    return;
-  }
-
-  res.json(lesson);
-});
-
-export default router;
+syntaxRouter.get(
+  "/syntax-lessons/:id",
+  asyncHandler(async (req, res) => {
+    const id = parseIntParam(req.params.id, "id");
+    const [row] = await db
+      .select(syntaxSelect)
+      .from(syntaxLessonsTable)
+      .leftJoin(languagesTable, eq(languagesTable.id, syntaxLessonsTable.languageId))
+      .where(eq(syntaxLessonsTable.id, id));
+    if (!row) throw new HttpError(404, "Syntax lesson not found");
+    res.json(row);
+  }),
+);

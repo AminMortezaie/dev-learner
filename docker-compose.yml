@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: devlearn-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: devlearn
+      POSTGRES_PASSWORD: devlearn
+      POSTGRES_DB: devlearn
+    ports:
+      - "5432:5432"
+    volumes:
+      - devlearn-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devlearn -d devlearn"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    platform: linux/amd64
+    container_name: devlearn-api
+    restart: unless-stopped
+    working_dir: /workspace
+    environment:
+      PORT: "5051"
+      DATABASE_URL: "postgres://devlearn:devlearn@postgres:5432/devlearn"
+      CI: "true"
+    ports:
+      - "5051:5051"
+    volumes:
+      - ./:/workspace
+      - devlearn-node-modules:/workspace/node_modules
+      - devlearn-api-nm:/workspace/artifacts/api-server/node_modules
+      - devlearn-web-nm:/workspace/artifacts/devlearn/node_modules
+      - devlearn-mockup-nm:/workspace/artifacts/mockup-sandbox/node_modules
+      - devlearn-scripts-nm:/workspace/scripts/node_modules
+      - devlearn-lib-apizod-nm:/workspace/lib/api-zod/node_modules
+      - devlearn-lib-db-nm:/workspace/lib/db/node_modules
+      - devlearn-lib-apiclient-nm:/workspace/lib/api-client-react/node_modules
+      - devlearn-lib-apispec-nm:/workspace/lib/api-spec/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5051/api/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 120s
+    command: >
+      sh -c "pnpm install --frozen-lockfile=false &&
+             pnpm --filter @workspace/db run push &&
+             pnpm --filter @workspace/api-server run seed &&
+             pnpm --filter @workspace/api-server dev"
+
+  devlearn:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    platform: linux/amd64
+    container_name: devlearn-web
+    restart: unless-stopped
+    working_dir: /workspace
+    environment:
+      PORT: "5174"
+      BASE_PATH: "/"
+      API_PROXY_TARGET: "http://api-server:5051"
+      CI: "true"
+    ports:
+      - "5174:5174"
+    volumes:
+      - ./:/workspace
+      - devlearn-node-modules:/workspace/node_modules
+      - devlearn-api-nm:/workspace/artifacts/api-server/node_modules
+      - devlearn-web-nm:/workspace/artifacts/devlearn/node_modules
+      - devlearn-mockup-nm:/workspace/artifacts/mockup-sandbox/node_modules
+      - devlearn-scripts-nm:/workspace/scripts/node_modules
+      - devlearn-lib-apizod-nm:/workspace/lib/api-zod/node_modules
+      - devlearn-lib-db-nm:/workspace/lib/db/node_modules
+      - devlearn-lib-apiclient-nm:/workspace/lib/api-client-react/node_modules
+      - devlearn-lib-apispec-nm:/workspace/lib/api-spec/node_modules
+    depends_on:
+      api-server:
+        condition: service_healthy
+    command: >
+      sh -c "pnpm --filter @workspace/devlearn dev"
+
+volumes:
+  devlearn-pgdata:
+  devlearn-node-modules:
+  devlearn-api-nm:
+  devlearn-web-nm:
+  devlearn-mockup-nm:
+  devlearn-scripts-nm:
+  devlearn-lib-apizod-nm:
+  devlearn-lib-db-nm:
+  devlearn-lib-apiclient-nm:
+  devlearn-lib-apispec-nm:

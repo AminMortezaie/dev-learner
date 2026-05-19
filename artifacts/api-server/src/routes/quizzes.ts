@@ -1,144 +1,152 @@
-import { Router, type IRouter } from "express";
-import { db, quizzesTable, quizQuestionsTable, languagesTable } from "@workspace/db";
-import { eq, and, type SQL } from "drizzle-orm";
+import { Router } from "express";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { z } from "zod/v4";
 import {
-  ListQuizzesQueryParams,
-  GetQuizParams,
-  SubmitQuizAttemptParams,
-  SubmitQuizAttemptBody,
-} from "@workspace/api-zod";
+  db,
+  quizzesTable,
+  quizQuestionsTable,
+  languagesTable,
+} from "@workspace/db";
+import { asyncHandler } from "../lib/async.ts";
+import { HttpError } from "../lib/errors.ts";
+import { parseIntParam, parseOptionalInt } from "../lib/parse.ts";
 
-const router: IRouter = Router();
+export const quizzesRouter = Router();
 
-router.get("/quizzes", async (req, res): Promise<void> => {
-  const query = ListQuizzesQueryParams.safeParse(req.query);
-  if (!query.success) {
-    res.status(400).json({ error: query.error.message });
-    return;
-  }
+const PASS_THRESHOLD = 0.7;
 
-  const conditions: SQL[] = [];
-  if (query.data.languageId) conditions.push(eq(quizzesTable.languageId, query.data.languageId));
-  if (query.data.topicId) conditions.push(eq(quizzesTable.topicId, query.data.topicId));
+const quizSelect = {
+  id: quizzesTable.id,
+  title: quizzesTable.title,
+  description: quizzesTable.description,
+  articleId: quizzesTable.articleId,
+  topicId: quizzesTable.topicId,
+  languageId: quizzesTable.languageId,
+  createdAt: quizzesTable.createdAt,
+  languageName: languagesTable.name,
+};
 
-  const quizzes = await db
-    .select({
-      id: quizzesTable.id,
-      title: quizzesTable.title,
-      description: quizzesTable.description,
-      articleId: quizzesTable.articleId,
-      topicId: quizzesTable.topicId,
-      languageId: quizzesTable.languageId,
-      languageName: languagesTable.name,
-      createdAt: quizzesTable.createdAt,
-    })
-    .from(quizzesTable)
-    .leftJoin(languagesTable, eq(quizzesTable.languageId, languagesTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(quizzesTable.createdAt);
+quizzesRouter.get(
+  "/quizzes",
+  asyncHandler(async (req, res) => {
+    const languageId = parseOptionalInt(req.query.languageId);
+    const topicId = parseOptionalInt(req.query.topicId);
+    const articleId = parseOptionalInt(req.query.articleId);
 
-  // Get question counts
-  const result = await Promise.all(
-    quizzes.map(async (quiz) => {
-      const questions = await db.select().from(quizQuestionsTable).where(eq(quizQuestionsTable.quizId, quiz.id));
-      return { ...quiz, questionCount: questions.length, questions: [] };
-    })
-  );
+    const where = [];
+    if (languageId !== undefined) where.push(eq(quizzesTable.languageId, languageId));
+    if (topicId !== undefined) where.push(eq(quizzesTable.topicId, topicId));
+    if (articleId !== undefined) where.push(eq(quizzesTable.articleId, articleId));
 
-  res.json(result);
+    const rows = await db
+      .select(quizSelect)
+      .from(quizzesTable)
+      .leftJoin(languagesTable, eq(languagesTable.id, quizzesTable.languageId))
+      .where(where.length ? and(...where) : undefined)
+      .orderBy(quizzesTable.id);
+
+    if (rows.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    const counts = await db
+      .select({
+        quizId: quizQuestionsTable.quizId,
+        c: sql<number>`count(*)::int`,
+      })
+      .from(quizQuestionsTable)
+      .where(inArray(quizQuestionsTable.quizId, rows.map((r) => r.id)))
+      .groupBy(quizQuestionsTable.quizId);
+
+    const countMap = new Map(counts.map((c) => [c.quizId, c.c]));
+
+    res.json(
+      rows.map((r) => ({
+        ...r,
+        createdAt: r.createdAt ? r.createdAt.toISOString() : null,
+        questionCount: countMap.get(r.id) ?? 0,
+      })),
+    );
+  }),
+);
+
+quizzesRouter.get(
+  "/quizzes/:id",
+  asyncHandler(async (req, res) => {
+    const id = parseIntParam(req.params.id, "id");
+    const [quiz] = await db
+      .select(quizSelect)
+      .from(quizzesTable)
+      .leftJoin(languagesTable, eq(languagesTable.id, quizzesTable.languageId))
+      .where(eq(quizzesTable.id, id));
+    if (!quiz) throw new HttpError(404, "Quiz not found");
+    const questions = await db
+      .select()
+      .from(quizQuestionsTable)
+      .where(eq(quizQuestionsTable.quizId, id))
+      .orderBy(quizQuestionsTable.orderIndex, quizQuestionsTable.id);
+    res.json({
+      ...quiz,
+      createdAt: quiz.createdAt ? quiz.createdAt.toISOString() : null,
+      questionCount: questions.length,
+      questions,
+    });
+  }),
+);
+
+const attemptSchema = z.object({
+  answers: z
+    .array(
+      z.object({
+        questionId: z.number().int().positive(),
+        selectedAnswer: z.number().int().min(0),
+      }),
+    )
+    .min(1),
 });
 
-router.get("/quizzes/:id", async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetQuizParams.safeParse({ id: parseInt(raw, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+quizzesRouter.post(
+  "/quizzes/:id/attempt",
+  asyncHandler(async (req, res) => {
+    const id = parseIntParam(req.params.id, "id");
+    const { answers } = attemptSchema.parse(req.body);
 
-  const [quiz] = await db
-    .select({
-      id: quizzesTable.id,
-      title: quizzesTable.title,
-      description: quizzesTable.description,
-      articleId: quizzesTable.articleId,
-      topicId: quizzesTable.topicId,
-      languageId: quizzesTable.languageId,
-      languageName: languagesTable.name,
-      createdAt: quizzesTable.createdAt,
-    })
-    .from(quizzesTable)
-    .leftJoin(languagesTable, eq(quizzesTable.languageId, languagesTable.id))
-    .where(eq(quizzesTable.id, params.data.id));
+    const questions = await db
+      .select()
+      .from(quizQuestionsTable)
+      .where(eq(quizQuestionsTable.quizId, id));
+    if (questions.length === 0) throw new HttpError(404, "Quiz has no questions");
 
-  if (!quiz) {
-    res.status(404).json({ error: "Quiz not found" });
-    return;
-  }
+    const byId = new Map(questions.map((q) => [q.id, q]));
+    const results = answers.map((a) => {
+      const q = byId.get(a.questionId);
+      if (!q) {
+        return {
+          questionId: a.questionId,
+          correct: false,
+          correctAnswer: -1,
+          explanation: "Unknown question id",
+        };
+      }
+      return {
+        questionId: a.questionId,
+        correct: a.selectedAnswer === q.correctAnswer,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation ?? null,
+      };
+    });
 
-  const questions = await db
-    .select()
-    .from(quizQuestionsTable)
-    .where(eq(quizQuestionsTable.quizId, quiz.id))
-    .orderBy(quizQuestionsTable.orderIndex);
+    const correctCount = results.filter((r) => r.correct).length;
+    const totalQuestions = questions.length;
+    const score = correctCount / totalQuestions;
 
-  res.json({
-    ...quiz,
-    questionCount: questions.length,
-    questions: questions.map((q) => ({ ...q, options: q.options as string[] })),
-  });
-});
-
-router.post("/quizzes/:id/attempt", async (req, res): Promise<void> => {
-  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = SubmitQuizAttemptParams.safeParse({ id: parseInt(rawId, 10) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const parsed = SubmitQuizAttemptBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-
-  const questions = await db
-    .select()
-    .from(quizQuestionsTable)
-    .where(eq(quizQuestionsTable.quizId, params.data.id));
-
-  if (questions.length === 0) {
-    res.status(404).json({ error: "Quiz not found or has no questions" });
-    return;
-  }
-
-  const questionMap = new Map(questions.map((q) => [q.id, q]));
-  let correctCount = 0;
-
-  const results = parsed.data.answers.map((answer) => {
-    const question = questionMap.get(answer.questionId);
-    if (!question) return { questionId: answer.questionId, correct: false, correctAnswer: 0, explanation: null };
-    const correct = answer.selectedAnswer === question.correctAnswer;
-    if (correct) correctCount++;
-    return {
-      questionId: answer.questionId,
-      correct,
-      correctAnswer: question.correctAnswer,
-      explanation: question.explanation ?? null,
-    };
-  });
-
-  const totalQuestions = questions.length;
-  const score = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
-
-  res.json({
-    score: Math.round(score * 10) / 10,
-    totalQuestions,
-    correctCount,
-    passed: score >= 70,
-    results,
-  });
-});
-
-export default router;
+    res.json({
+      score,
+      totalQuestions,
+      correctCount,
+      passed: score >= PASS_THRESHOLD,
+      results,
+    });
+  }),
+);

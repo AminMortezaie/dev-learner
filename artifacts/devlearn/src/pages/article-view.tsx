@@ -1,23 +1,190 @@
+import React from "react";
 import { useParams, useLocation } from "wouter";
-import { useGetArticle, useGetArticleQuiz } from "@workspace/api-client-react";
+import {
+  useGetArticle,
+  useGetArticleQuiz,
+  getGetArticleQueryKey,
+  getGetArticleQuizQueryKey,
+} from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CodeBlock } from "@/components/code-block";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, BrainCircuit, Calendar, Tag } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
+function renderInline(text: string): React.ReactNode {
+  // Order matters: bold (**) before italic (*), then inline code
+  const parts = text.split(/(\*\*[^*]+\*\*|(?<!\*)\*(?!\*)[^*]+(?<!\*)\*(?!\*)|`[^`]+`)/);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**')) return <em key={i}>{part.slice(1, -1)}</em>;
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) return <code key={i}>{part.slice(1, -1)}</code>;
+    return part;
+  });
+}
+
+function isBulletLine(line: string): boolean {
+  const t = line.trimStart();
+  return t.startsWith('- ') || t.startsWith('* ');
+}
+
+function isOrderedLine(line: string): boolean {
+  return /^\s*\d+\. /.test(line);
+}
+
+function stripBullet(line: string): string {
+  return line.trimStart().replace(/^[-*] /, '').replace(/^\d+\. /, '');
+}
+
+function renderMarkdown(content: string): React.ReactNode[] {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+  let paraLines: string[] = [];
+
+  const key = (prefix: string) => `${prefix}-${elements.length}-${i}`;
+
+  const flushPara = () => {
+    if (paraLines.length === 0) return;
+    const text = paraLines.join(' ').trim();
+    if (text) elements.push(<p key={key('p')}>{renderInline(text)}</p>);
+    paraLines = [];
+  };
+
+  while (i < lines.length) {
+    const line = lines[i]!;
+    const trimmed = line.trim();
+
+    if (trimmed === '') {
+      flushPara();
+      i++;
+      continue;
+    }
+
+    // Horizontal rule: --- or *** or ===== or long dashes (not a bullet point)
+    if (/^[-=]{3,}$/.test(trimmed) || /^\*{3,}$/.test(trimmed)) {
+      flushPara();
+      elements.push(<hr key={key('hr')} className="my-6 border-border" />);
+      i++;
+      continue;
+    }
+
+    // Headings (#### h4 and ##### h5 too)
+    if (line.startsWith('##### ')) {
+      flushPara();
+      elements.push(<h5 key={key('h')}>{renderInline(line.slice(6))}</h5>);
+      i++; continue;
+    }
+    if (line.startsWith('#### ')) {
+      flushPara();
+      elements.push(<h4 key={key('h')}>{renderInline(line.slice(5))}</h4>);
+      i++; continue;
+    }
+    if (line.startsWith('### ')) {
+      flushPara();
+      elements.push(<h3 key={key('h')}>{renderInline(line.slice(4))}</h3>);
+      i++; continue;
+    }
+    if (line.startsWith('## ')) {
+      flushPara();
+      elements.push(<h2 key={key('h')}>{renderInline(line.slice(3))}</h2>);
+      i++; continue;
+    }
+    if (line.startsWith('# ')) {
+      flushPara();
+      elements.push(<h1 key={key('h')}>{renderInline(line.slice(2))}</h1>);
+      i++; continue;
+    }
+
+    // Code block
+    if (trimmed.startsWith('```')) {
+      flushPara();
+      const lang = trimmed.slice(3).trim() || 'text';
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i]!.trimStart().startsWith('```')) {
+        codeLines.push(lines[i]!);
+        i++;
+      }
+      i++; // skip closing ```
+      elements.push(
+        <div key={key('code')} className="rounded-lg overflow-hidden border border-border my-4">
+          <CodeBlock code={codeLines.join('\n')} language={lang} />
+        </div>
+      );
+      continue;
+    }
+
+    // Blockquote
+    if (trimmed.startsWith('> ')) {
+      flushPara();
+      const qLines: string[] = [];
+      while (i < lines.length && lines[i]!.trim().startsWith('> ')) {
+        qLines.push(lines[i]!.trim().slice(2));
+        i++;
+      }
+      elements.push(
+        <blockquote key={key('bq')}>
+          {qLines.map((l, j) => <p key={j}>{renderInline(l)}</p>)}
+        </blockquote>
+      );
+      continue;
+    }
+
+    // Unordered list (handles indented bullets too)
+    if (isBulletLine(line)) {
+      flushPara();
+      const items: string[] = [];
+      while (i < lines.length && isBulletLine(lines[i]!)) {
+        items.push(stripBullet(lines[i]!));
+        i++;
+      }
+      elements.push(
+        <ul key={key('ul')}>
+          {items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
+        </ul>
+      );
+      continue;
+    }
+
+    // Ordered list
+    if (isOrderedLine(line)) {
+      flushPara();
+      const items: string[] = [];
+      while (i < lines.length && isOrderedLine(lines[i]!)) {
+        items.push(stripBullet(lines[i]!));
+        i++;
+      }
+      elements.push(
+        <ol key={key('ol')}>
+          {items.map((item, j) => <li key={j}>{renderInline(item)}</li>)}
+        </ol>
+      );
+      continue;
+    }
+
+    paraLines.push(line);
+    i++;
+  }
+
+  flushPara();
+  return elements;
+}
+
 export default function ArticleView() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const { data: article, isLoading } = useGetArticle(parseInt(id!), {
-    query: { enabled: !!id }
+  const articleId = parseInt(id!);
+  const { data: article, isLoading } = useGetArticle(articleId, {
+    query: { queryKey: getGetArticleQueryKey(articleId), enabled: !!id },
   });
 
-  const getQuiz = useGetArticleQuiz(parseInt(id!), {
-    query: { enabled: false }
+  const getQuiz = useGetArticleQuiz(articleId, {
+    query: { queryKey: getGetArticleQuizQueryKey(articleId), enabled: false },
   });
 
   const handleGenerateQuiz = async () => {
@@ -93,32 +260,11 @@ export default function ArticleView() {
         </div>
       </div>
 
-      <div className="prose prose-invert prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-border max-w-none">
-        {/* Very basic markdown rendering for demonstration since we don't have react-markdown installed in scaffold */}
-        {article.content.split('\n\n').map((paragraph, idx) => {
-          if (paragraph.startsWith('# ')) {
-            return <h1 key={idx}>{paragraph.substring(2)}</h1>;
-          }
-          if (paragraph.startsWith('## ')) {
-            return <h2 key={idx}>{paragraph.substring(3)}</h2>;
-          }
-          if (paragraph.startsWith('### ')) {
-            return <h3 key={idx}>{paragraph.substring(4)}</h3>;
-          }
-          if (paragraph.startsWith('```')) {
-            const lines = paragraph.split('\n');
-            const code = lines.slice(1, lines.length - 1).join('\n');
-            return (
-              <pre key={idx} className="p-4 rounded-lg bg-black font-mono text-sm overflow-x-auto border border-border">
-                <code>{code}</code>
-              </pre>
-            );
-          }
-          return <p key={idx}>{paragraph}</p>;
-        })}
+      <div className="prose dark:prose-invert prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-border max-w-none">
+        {renderMarkdown(article.content)}
       </div>
 
-      <div className="mt-16 p-8 border border-border bg-card/50 rounded-xl text-center">
+      <div className="mt-16 p-4 md:p-8 border border-border bg-card/50 rounded-xl text-center">
         <h3 className="text-xl font-bold mb-2">Test Your Knowledge</h3>
         <p className="text-muted-foreground mb-6">
           Generate an interactive quiz based on the contents of this article to reinforce your learning.

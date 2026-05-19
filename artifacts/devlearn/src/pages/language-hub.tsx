@@ -1,5 +1,9 @@
 import { useParams, Link } from "wouter";
-import { useListLanguages, useListTopics, useListResources, useListQuizzes, useListSyntaxLessons } from "@workspace/api-client-react";
+import {
+  useListLanguages,
+  useListTopics,
+  getListTopicsQueryKey,
+} from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,9 +32,10 @@ export default function LanguageHub() {
   const language = languages?.find(l => l.slug === slug);
   const langId = language?.id;
 
+  const topicsParams = { languageId: langId };
   const { data: topics, isLoading: topicsLoading } = useListTopics(
-    { languageId: langId }, 
-    { query: { enabled: !!langId } }
+    topicsParams,
+    { query: { queryKey: getListTopicsQueryKey(topicsParams), enabled: !!langId } },
   );
 
   if (langsLoading) {
@@ -54,12 +59,12 @@ export default function LanguageHub() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="p-8 rounded-2xl border border-border bg-card/30 backdrop-blur flex items-start gap-6">
-        <div className={`p-4 rounded-xl bg-background/50 border border-border ${colorClass}`}>
-          <Icon className="h-12 w-12" />
+      <div className="p-4 md:p-8 rounded-2xl border border-border bg-card/30 backdrop-blur flex flex-col sm:flex-row items-start gap-4 md:gap-6">
+        <div className={`p-3 md:p-4 rounded-xl bg-background/50 border border-border shrink-0 ${colorClass}`}>
+          <Icon className="h-8 w-8 md:h-12 md:w-12" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">{language.name}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">{language.name}</h1>
           <p className="text-muted-foreground max-w-2xl">{language.description}</p>
         </div>
       </div>

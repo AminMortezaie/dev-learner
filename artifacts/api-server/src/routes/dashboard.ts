@@ -1,112 +1,143 @@
-import { Router, type IRouter } from "express";
-import { db, languagesTable, topicsTable, resourcesTable, articlesTable, quizzesTable, syntaxLessonsTable } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { Router } from "express";
+import { desc, eq, sql } from "drizzle-orm";
+import {
+  db,
+  languagesTable,
+  topicsTable,
+  resourcesTable,
+  articlesTable,
+  quizzesTable,
+  syntaxLessonsTable,
+} from "@workspace/db";
+import { asyncHandler } from "../lib/async.ts";
 
-const router: IRouter = Router();
+export const dashboardRouter = Router();
 
-router.get("/dashboard/stats", async (_req, res): Promise<void> => {
-  const [[totalLanguages], [totalTopics], [totalResources], [totalArticles], [totalQuizzes], [totalSyntaxLessons]] =
-    await Promise.all([
-      db.select({ count: count() }).from(languagesTable),
-      db.select({ count: count() }).from(topicsTable),
-      db.select({ count: count() }).from(resourcesTable),
-      db.select({ count: count() }).from(articlesTable),
-      db.select({ count: count() }).from(quizzesTable),
-      db.select({ count: count() }).from(syntaxLessonsTable),
+async function countOf(
+  query: Promise<Array<{ c: number }>>,
+): Promise<number> {
+  const [r] = await query;
+  return r?.c ?? 0;
+}
+
+const COUNT = { c: sql<number>`count(*)::int` };
+
+dashboardRouter.get(
+  "/dashboard/stats",
+  asyncHandler(async (_req, res) => {
+    const [totalTopics, totalResources, totalArticles, totalQuizzes, totalSyntaxLessons, totalLanguages] =
+      await Promise.all([
+        countOf(db.select(COUNT).from(topicsTable)),
+        countOf(db.select(COUNT).from(resourcesTable)),
+        countOf(db.select(COUNT).from(articlesTable)),
+        countOf(db.select(COUNT).from(quizzesTable)),
+        countOf(db.select(COUNT).from(syntaxLessonsTable)),
+        countOf(db.select(COUNT).from(languagesTable)),
+      ]);
+    res.json({
+      totalTopics,
+      totalResources,
+      totalArticles,
+      totalQuizzes,
+      totalSyntaxLessons,
+      totalLanguages,
+    });
+  }),
+);
+
+dashboardRouter.get(
+  "/dashboard/recent-activity",
+  asyncHandler(async (_req, res) => {
+    const RECENT = 5;
+    const [resources, articles, quizzes] = await Promise.all([
+      db
+        .select({
+          id: resourcesTable.id,
+          title: resourcesTable.title,
+          url: resourcesTable.url,
+          type: resourcesTable.type,
+          description: resourcesTable.description,
+          languageId: resourcesTable.languageId,
+          topicId: resourcesTable.topicId,
+          tags: resourcesTable.tags,
+          createdAt: resourcesTable.createdAt,
+        })
+        .from(resourcesTable)
+        .orderBy(desc(resourcesTable.id))
+        .limit(RECENT),
+      db
+        .select({
+          id: articlesTable.id,
+          title: articlesTable.title,
+          content: articlesTable.content,
+          summary: articlesTable.summary,
+          languageId: articlesTable.languageId,
+          tags: articlesTable.tags,
+          createdAt: articlesTable.createdAt,
+        })
+        .from(articlesTable)
+        .orderBy(desc(articlesTable.id))
+        .limit(RECENT),
+      db
+        .select({
+          id: quizzesTable.id,
+          title: quizzesTable.title,
+          description: quizzesTable.description,
+          articleId: quizzesTable.articleId,
+          topicId: quizzesTable.topicId,
+          languageId: quizzesTable.languageId,
+          createdAt: quizzesTable.createdAt,
+        })
+        .from(quizzesTable)
+        .orderBy(desc(quizzesTable.id))
+        .limit(RECENT),
     ]);
 
-  res.json({
-    totalLanguages: totalLanguages?.count ?? 0,
-    totalTopics: totalTopics?.count ?? 0,
-    totalResources: totalResources?.count ?? 0,
-    totalArticles: totalArticles?.count ?? 0,
-    totalQuizzes: totalQuizzes?.count ?? 0,
-    totalSyntaxLessons: totalSyntaxLessons?.count ?? 0,
-  });
-});
+    const iso = <T extends { createdAt: Date | null }>(r: T) => ({
+      ...r,
+      createdAt: r.createdAt ? r.createdAt.toISOString() : null,
+    });
 
-router.get("/dashboard/recent-activity", async (_req, res): Promise<void> => {
-  const [rawResources, rawArticles, rawQuizzes] = await Promise.all([
-    db
-      .select({
-        id: resourcesTable.id,
-        title: resourcesTable.title,
-        url: resourcesTable.url,
-        type: resourcesTable.type,
-        description: resourcesTable.description,
-        languageId: resourcesTable.languageId,
-        languageName: languagesTable.name,
-        topicId: resourcesTable.topicId,
-        tags: resourcesTable.tags,
-        createdAt: resourcesTable.createdAt,
-      })
-      .from(resourcesTable)
-      .leftJoin(languagesTable, eq(resourcesTable.languageId, languagesTable.id))
-      .orderBy(resourcesTable.createdAt)
-      .limit(5),
-    db
-      .select({
-        id: articlesTable.id,
-        title: articlesTable.title,
-        content: articlesTable.content,
-        summary: articlesTable.summary,
-        languageId: articlesTable.languageId,
-        languageName: languagesTable.name,
-        tags: articlesTable.tags,
-        createdAt: articlesTable.createdAt,
-      })
-      .from(articlesTable)
-      .leftJoin(languagesTable, eq(articlesTable.languageId, languagesTable.id))
-      .orderBy(articlesTable.createdAt)
-      .limit(5),
-    db
-      .select({
-        id: quizzesTable.id,
-        title: quizzesTable.title,
-        description: quizzesTable.description,
-        articleId: quizzesTable.articleId,
-        topicId: quizzesTable.topicId,
-        languageId: quizzesTable.languageId,
-        languageName: languagesTable.name,
-        createdAt: quizzesTable.createdAt,
-      })
-      .from(quizzesTable)
-      .leftJoin(languagesTable, eq(quizzesTable.languageId, languagesTable.id))
-      .orderBy(quizzesTable.createdAt)
-      .limit(5),
-  ]);
+    res.json({
+      resources: resources.map(iso),
+      articles: articles.map(iso),
+      quizzes: quizzes.map(iso),
+    });
+  }),
+);
 
-  const resources = rawResources.map((r) => ({ ...r, topicTitle: null }));
-  const articles = rawArticles.map((a) => ({ ...a, hasQuiz: false }));
-  const quizzes = rawQuizzes.map((q) => ({ ...q, questionCount: null, questions: [] }));
-
-  res.json({ resources, articles, quizzes });
-});
-
-router.get("/dashboard/language-progress", async (_req, res): Promise<void> => {
-  const langs = await db.select().from(languagesTable).orderBy(languagesTable.id);
-
-  const progress = await Promise.all(
-    langs.map(async (lang) => {
-      const [[topicCount], [resourceCount], [lessonCount], [quizCount]] = await Promise.all([
-        db.select({ count: count() }).from(topicsTable).where(eq(topicsTable.languageId, lang.id)),
-        db.select({ count: count() }).from(resourcesTable).where(eq(resourcesTable.languageId, lang.id)),
-        db.select({ count: count() }).from(syntaxLessonsTable).where(eq(syntaxLessonsTable.languageId, lang.id)),
-        db.select({ count: count() }).from(quizzesTable).where(eq(quizzesTable.languageId, lang.id)),
-      ]);
-
-      return {
-        languageId: lang.id,
-        languageName: lang.name,
-        topicCount: topicCount?.count ?? 0,
-        resourceCount: resourceCount?.count ?? 0,
-        lessonCount: lessonCount?.count ?? 0,
-        quizCount: quizCount?.count ?? 0,
-      };
-    })
-  );
-
-  res.json(progress);
-});
-
-export default router;
+dashboardRouter.get(
+  "/dashboard/language-progress",
+  asyncHandler(async (_req, res) => {
+    const langs = await db.select().from(languagesTable).orderBy(languagesTable.id);
+    const out = await Promise.all(
+      langs.map(async (l) => {
+        const [t] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(topicsTable)
+          .where(eq(topicsTable.languageId, l.id));
+        const [r] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(resourcesTable)
+          .where(eq(resourcesTable.languageId, l.id));
+        const [s] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(syntaxLessonsTable)
+          .where(eq(syntaxLessonsTable.languageId, l.id));
+        const [q] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(quizzesTable)
+          .where(eq(quizzesTable.languageId, l.id));
+        return {
+          languageId: l.id,
+          languageName: l.name,
+          topicCount: t?.c ?? 0,
+          resourceCount: r?.c ?? 0,
+          lessonCount: s?.c ?? 0,
+          quizCount: q?.c ?? 0,
+        };
+      }),
+    );
+    res.json(out);
+  }),
+);

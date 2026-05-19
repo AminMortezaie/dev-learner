@@ -1,17 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
+  "include": ["src/**/*", "esbuild.config.mjs"],
+  "exclude": ["node_modules", "dist"],
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["src"],
   "references": [
-    {
-      "path": "../../lib/db"
-    },
-    {
-      "path": "../../lib/api-zod"
-    }
+    { "path": "../../lib/db" },
+    { "path": "../../lib/api-zod" }
   ]
 }

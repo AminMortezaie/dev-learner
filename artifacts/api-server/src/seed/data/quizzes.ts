@@ -1,0 +1,1185 @@
+/**
+ * Senior-level quizzes. Each quiz binds to a language and optionally a topic
+ * (by title). correctAnswer is a 0-based index into options.
+ */
+export interface QuizQuestionSeed {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+}
+
+export interface QuizSeed {
+  languageSlug: string;
+  topicTitle?: string;
+  title: string;
+  description: string;
+  questions: QuizQuestionSeed[];
+}
+
+export const QUIZZES: QuizSeed[] = [
+  // ============================================================
+  // SYSTEM DESIGN
+  // ============================================================
+  {
+    languageSlug: "system-design",
+    topicTitle: "CAP theorem in practice",
+    title: "CAP theorem — what it really says",
+    description:
+      "Most CAP confusion comes from treating it as a free choice between three. Test the precise meaning.",
+    questions: [
+      {
+        question: "In CAP, when does the system actually have to choose between C and A?",
+        options: [
+          "All the time, regardless of network state",
+          "Only when a network partition exists between nodes",
+          "Only during garbage collection pauses",
+          "Only on writes, never on reads",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "CAP says: during a partition, you must choose between consistency and availability. With no partition, you can have both.",
+      },
+      {
+        question: "Which of these is the MOST accurate description of a 'CP' system under partition?",
+        options: [
+          "It returns stale data quickly to keep users happy",
+          "It rejects or stalls requests on the minority side to preserve linearizability",
+          "It silently accepts writes everywhere and reconciles later",
+          "It guarantees no data loss across all replicas",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "A CP system gives up availability on the minority side to preserve consistency. ZooKeeper and etcd behave this way.",
+      },
+      {
+        question: "Eventual consistency, in the strict definition, guarantees:",
+        options: [
+          "No updates will ever be lost",
+          "If updates stop, all replicas converge to the same value",
+          "Reads always reflect the most recent write within 100ms",
+          "Writes are linearizable across all replicas",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Eventual consistency = if writes stop, replicas converge. It says nothing about bounded staleness or about loss.",
+      },
+      {
+        question: "Spanner achieves global strong consistency primarily by using:",
+        options: [
+          "Vector clocks at every replica",
+          "Logical timestamps with Lamport ordering",
+          "TrueTime — atomic clocks + GPS giving bounded uncertainty intervals",
+          "Conflict-free replicated data types",
+        ],
+        correctAnswer: 2,
+        explanation:
+          "Spanner's TrueTime API exposes a tight bound on clock uncertainty, which lets it commit transactions in real-time order.",
+      },
+      {
+        question: "Which statement about quorum reads/writes (W + R > N) is correct?",
+        options: [
+          "It guarantees linearizability under all failure modes",
+          "It guarantees a read overlaps at least one node with the latest write, but reconciliation may still be needed",
+          "It eliminates the need for any kind of replication log",
+          "It is equivalent to single-leader replication",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Dynamo-style quorums guarantee overlap, not linearizability — concurrent writes can still produce conflicts requiring resolution.",
+      },
+      {
+        question: "PACELC extends CAP by adding which dimension?",
+        options: [
+          "Partition tolerance vs. latency",
+          "Even without partitions, there is a tradeoff between latency and consistency",
+          "Availability vs. cost",
+          "Consistency vs. throughput",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "PACELC says: during a Partition choose A or C; Else (normal operation) choose L (latency) or C (consistency). DynamoDB is PA/EL; Spanner is PC/EC.",
+      },
+      {
+        question: "Linearizability differs from serializability in that:",
+        options: [
+          "Linearizability applies to multi-object transactions; serializability to single objects",
+          "Linearizability requires real-time ordering of operations; serializability is about transaction isolation",
+          "They are equivalent — different names for the same guarantee",
+          "Serializability is stronger than linearizability",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Linearizability is a recency guarantee on individual operations. Serializability is an isolation guarantee across transactions. Strict serializability combines both.",
+      },
+      {
+        question: "Read-your-writes consistency guarantees:",
+        options: [
+          "All users see all writes immediately",
+          "A user always sees their own writes in subsequent reads",
+          "All reads return the most recently committed write globally",
+          "Writes are applied in the same order on all replicas",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Read-your-writes (or read-your-own-writes) ensures a client doesn't see stale data after its own write, but makes no guarantees about other clients' writes.",
+      },
+      {
+        question: "Multi-leader replication's primary challenge compared to single-leader is:",
+        options: [
+          "Higher write latency",
+          "Resolving write conflicts when the same data is modified concurrently on different leaders",
+          "No support for replication lag monitoring",
+          "Inability to handle node failures",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "With multiple leaders, conflicting concurrent writes must be resolved — last-write-wins, CRDTs, or application-level merge logic.",
+      },
+      {
+        question: "The Raft consensus algorithm guarantees safety by:",
+        options: [
+          "Using vector clocks to order events",
+          "Ensuring only a node with an up-to-date log can be elected leader",
+          "Allowing any node to commit entries independently",
+          "Using a gossip protocol for leader election",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Raft's leader election requires candidates to have logs at least as up-to-date as any majority member, preventing data loss on failover.",
+      },
+    ],
+  },
+  {
+    languageSlug: "system-design",
+    topicTitle: "Caching strategies",
+    title: "Caching pitfalls",
+    description: "TTLs, invalidation, stampedes, and consistency.",
+    questions: [
+      {
+        question: "The 'thundering herd' problem with cache TTLs is best mitigated by:",
+        options: [
+          "Increasing the TTL so it never expires",
+          "Disabling caching for hot keys",
+          "Coalescing concurrent loaders for the same key (singleflight) or jittered TTLs",
+          "Switching to write-through caching",
+        ],
+        correctAnswer: 2,
+        explanation:
+          "Singleflight ensures only one goroutine/thread refills a hot key while the rest wait. Jitter spreads expirations.",
+      },
+      {
+        question: "Cache-aside means:",
+        options: [
+          "The cache is updated synchronously on every DB write",
+          "The application reads from the cache; on miss, reads from the DB and populates the cache",
+          "Writes go to the cache and asynchronously to the DB",
+          "The cache replaces the database",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Cache-aside (lazy loading) keeps the cache out of the write path. It's the most common pattern for read-heavy workloads.",
+      },
+      {
+        question: "Which is the MOST dangerous invalidation strategy for strongly-consistent reads?",
+        options: [
+          "Write-through with synchronous cache update",
+          "Cache-aside with explicit DELETE-on-write",
+          "TTL-only with no explicit invalidation",
+          "Read-through with write-back",
+        ],
+        correctAnswer: 2,
+        explanation:
+          "TTL-only invalidation can serve stale data for the full TTL. Strong-consistency systems need explicit invalidation.",
+      },
+      {
+        question: "A cache hit ratio of 99% with 1 ms cache reads and 100 ms DB reads gives an average latency of approximately:",
+        options: ["1 ms", "2 ms", "10 ms", "100 ms"],
+        correctAnswer: 1,
+        explanation: "0.99×1 + 0.01×100 = 0.99 + 1 = 1.99 ms ≈ 2 ms.",
+      },
+      {
+        question: "Negative caching is useful primarily to:",
+        options: [
+          "Increase hit ratio statistics",
+          "Avoid repeated expensive lookups for keys known to be missing",
+          "Replace database constraints",
+          "Reduce write amplification",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Caching 'not found' answers for a short window protects the DB from repeated misses on the same key.",
+      },
+      {
+        question: "Write-through caching differs from write-back (write-behind) in that:",
+        options: [
+          "Write-through is faster for write-heavy workloads",
+          "Write-through writes to cache and DB synchronously; write-back writes to cache first and DB asynchronously",
+          "Write-back is always more consistent",
+          "Write-through never evicts entries",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Write-through adds write latency but eliminates stale cache. Write-back is faster but risks data loss if the cache fails before flushing.",
+      },
+      {
+        question: "Cache warming is important after a cold start because:",
+        options: [
+          "The database is offline during warming",
+          "All requests hit the DB until the cache fills, creating a spike that can overwhelm the database",
+          "Warm caches consume less memory",
+          "Cold caches expire entries faster",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "A cold cache sends every request to the DB simultaneously. Strategies include pre-warming from a snapshot or gradually shifting traffic.",
+      },
+      {
+        question: "Redis SETNX is typically used to implement:",
+        options: [
+          "Rate limiting with sliding windows",
+          "Distributed locks (set if not exists — acquire lock only when key is absent)",
+          "Pub/sub messaging",
+          "Sorted set operations",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "SETNX (or SET … NX EX) is the basis of Redlock-style distributed locks. The key presence represents lock ownership.",
+      },
+      {
+        question: "A CDN serves cached content from edge nodes. The correct Cache-Control header to allow CDN caching but force end-users to revalidate is:",
+        options: [
+          "Cache-Control: no-store",
+          "Cache-Control: public, max-age=3600",
+          "Cache-Control: private, max-age=3600",
+          "Cache-Control: no-cache",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "public allows intermediate caches (CDNs) to cache the response. private restricts caching to the end user's browser only.",
+      },
+      {
+        question: "The cache stampede (dog-pile) effect occurs when:",
+        options: [
+          "The cache has insufficient memory and evicts entries prematurely",
+          "A popular cache entry expires and many concurrent requests simultaneously attempt to regenerate it",
+          "Two cache nodes disagree on the value of a key",
+          "The database write rate exceeds the cache's ingest speed",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "When a popular key expires, all waiting requests see a miss and simultaneously hit the DB. Solutions: probabilistic early expiration, locking, or background refresh.",
+      },
+    ],
+  },
+
+  // ============================================================
+  // JAVA
+  // ============================================================
+  {
+    languageSlug: "java",
+    topicTitle: "Java Memory Model",
+    title: "JMM and concurrency",
+    description: "happens-before, volatile, and what the JMM actually guarantees.",
+    questions: [
+      {
+        question: "Declaring a field 'volatile' guarantees:",
+        options: [
+          "Mutual exclusion across threads",
+          "Visibility of writes and ordering with respect to other volatile/synchronized accesses",
+          "Atomicity for compound operations like i++",
+          "That the field is stored in CPU registers",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "volatile gives visibility + ordering (happens-before). It does NOT make compound operations atomic.",
+      },
+      {
+        question: "After JSR-133 (Java 5+), double-checked locking is safe IF:",
+        options: [
+          "The field is declared private",
+          "The field is declared volatile",
+          "Used inside a synchronized block",
+          "The class is final",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Pre-JSR-133, a partially constructed object could be observed. With volatile + JSR-133 fence semantics, DCL is correct.",
+      },
+      {
+        question: "Which call ALONE is sufficient to safely publish an immutable object containing only final fields?",
+        options: [
+          "Storing it in a non-volatile field",
+          "Calling its constructor (final-field freeze)",
+          "Wrapping the publication in synchronized(this)",
+          "Calling Thread.yield() after construction",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "The JMM guarantees that final fields are visible to any thread that sees a properly constructed reference — without external synchronization.",
+      },
+      {
+        question: "ConcurrentHashMap.compute is preferable to get-then-put because:",
+        options: [
+          "It is faster on single-threaded code",
+          "It performs the read and write under the same bucket lock atomically",
+          "It avoids autoboxing of keys",
+          "It skips equals() checks",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "compute() runs the remapping function while holding the bucket-level lock, preventing lost updates.",
+      },
+      {
+        question: "AtomicInteger.incrementAndGet is implemented with:",
+        options: [
+          "synchronized methods",
+          "A native fence and an unbounded retry loop",
+          "Compare-and-swap (CAS) in a retry loop",
+          "A read-write lock",
+        ],
+        correctAnswer: 2,
+        explanation:
+          "It loops over compareAndSet — read current, compute new, attempt CAS, retry on contention.",
+      },
+      {
+        question: "StampedLock.tryOptimisticRead differs from ReadWriteLock.readLock in that:",
+        options: [
+          "It acquires a shared lock that blocks writers",
+          "It returns a stamp without acquiring any lock, allowing concurrent writes — validation is required after reading",
+          "It is reentrant by default",
+          "It always succeeds even under high contention",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Optimistic reads don't block writers. You read, then validate the stamp; if invalid (a write occurred), fall back to a pessimistic read.",
+      },
+      {
+        question: "CountDownLatch differs from CyclicBarrier in that:",
+        options: [
+          "CountDownLatch can be reset and reused; CyclicBarrier cannot",
+          "CyclicBarrier can be reset and reused; CountDownLatch fires once and is done",
+          "CountDownLatch requires all threads to call countDown(); CyclicBarrier doesn't",
+          "They are functionally identical",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "CountDownLatch is a one-shot gate. CyclicBarrier can be reused and optionally runs a barrier action when tripped.",
+      },
+      {
+        question: "ThreadLocal can cause memory leaks in thread-pool environments because:",
+        options: [
+          "ThreadLocal uses weak references that are collected too eagerly",
+          "Pool threads are long-lived; ThreadLocal values are never GC'd as long as the thread lives, leaking across tasks",
+          "ThreadLocal values are stored in the heap, not the stack",
+          "Thread pools limit the number of active ThreadLocal values",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "A thread-pool thread's ThreadLocalMap holds values for the thread's lifetime. Always call remove() in a finally block.",
+      },
+      {
+        question: "The happens-before relationship between thread start and the thread's actions means:",
+        options: [
+          "Actions after thread.start() in the parent are visible to the new thread only if synchronized",
+          "All actions in the parent before thread.start() are visible to the new thread without any additional synchronization",
+          "The new thread sees only volatile writes from the parent",
+          "Thread.start() flushes all caches globally",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "JMM guarantees: everything the parent thread does before thread.start() happens-before any action in that new thread.",
+      },
+      {
+        question: "ForkJoinPool.commonPool() work stealing means:",
+        options: [
+          "Threads share a single global queue and compete for tasks",
+          "Idle threads steal tasks from the tail of other threads' deques, reducing contention",
+          "Tasks are distributed round-robin to all threads",
+          "Each task is duplicated across multiple threads for redundancy",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Work stealing: each thread has a deque, pushes/pops from the head, and steals from the tail of others when idle — excellent cache locality and low contention.",
+      },
+    ],
+  },
+  {
+    languageSlug: "java",
+    topicTitle: "Virtual threads (Project Loom)",
+    title: "Virtual threads",
+    description: "How JEP 444 actually behaves under load.",
+    questions: [
+      {
+        question: "Virtual threads in JDK 21 are scheduled by:",
+        options: [
+          "The operating system, like platform threads",
+          "A ForkJoinPool of carrier (platform) threads inside the JVM",
+          "Project Reactor's elastic scheduler",
+          "A single dedicated dispatcher thread",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "The JVM scheduler multiplexes virtual threads onto carrier platform threads using a ForkJoinPool.",
+      },
+      {
+        question: "'Pinning' happens when:",
+        options: [
+          "A virtual thread is killed by the OS",
+          "A virtual thread cannot unmount from its carrier (e.g. inside a synchronized block holding a blocking call)",
+          "A platform thread runs longer than expected",
+          "A thread is starved by the GC",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Pinning ties a virtual thread to a carrier, defeating the scalability win. Replace synchronized with ReentrantLock around blocking calls.",
+      },
+      {
+        question: "For a 100% CPU-bound workload, virtual threads compared to platform threads will be:",
+        options: [
+          "Significantly faster",
+          "Significantly slower",
+          "About the same — virtual threads don't make CPU faster",
+          "Limited to one core",
+        ],
+        correctAnswer: 2,
+        explanation:
+          "Virtual threads only help when work is blocked on I/O. CPU-bound code still needs CPU; no free lunch.",
+      },
+      {
+        question: "The recommended pool sizing for blocking I/O with virtual threads is:",
+        options: [
+          "Math.max(2, cores)",
+          "200 × cores",
+          "No fixed pool — use newVirtualThreadPerTaskExecutor()",
+          "A single fixed thread",
+        ],
+        correctAnswer: 2,
+        explanation:
+          "Virtual threads make per-task threading practical. Bounded pools become a thing of the past for I/O-bound work.",
+      },
+      {
+        question: "Which API does NOT block carrier threads (i.e. is virtual-thread friendly out of the box)?",
+        options: [
+          "java.net.Socket I/O",
+          "JNI calls into native code",
+          "Object.wait() while holding an intrinsic monitor",
+          "Calls into a third-party C library doing blocking syscalls",
+        ],
+        correctAnswer: 0,
+        explanation:
+          "JDK java.net I/O was reworked to park virtual threads instead of pinning. JNI and intrinsic monitors still pin.",
+      },
+      {
+        question: "Structured Concurrency (JEP 453, JDK 21 preview) with StructuredTaskScope.ShutdownOnFailure:",
+        options: [
+          "Waits for all subtasks unconditionally regardless of failures",
+          "Cancels all remaining subtasks as soon as one fails, then re-throws the first exception",
+          "Silently ignores subtask failures and returns partial results",
+          "Requires manual cancellation of sibling tasks",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "ShutdownOnFailure shuts down the scope on the first failure, cancels siblings, and surfaces the exception via throwIfFailed().",
+      },
+      {
+        question: "ThreadLocal usage with virtual threads can be problematic because:",
+        options: [
+          "Virtual threads don't support ThreadLocal at all",
+          "With millions of virtual threads, per-thread state stored in ThreadLocals multiplies memory usage significantly",
+          "ThreadLocal is always cleared between virtual thread tasks",
+          "Virtual threads share a single ThreadLocalMap",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Virtual threads are cheap to create in huge numbers, so ThreadLocal-per-thread state that was negligible for platform threads becomes a memory concern. ScopedValue is the recommended alternative.",
+      },
+      {
+        question: "Virtual threads improve throughput for I/O-bound services primarily by:",
+        options: [
+          "Making I/O operations faster",
+          "Allowing the carrier thread to serve other virtual threads while one is blocked on I/O",
+          "Bypassing the OS kernel for network calls",
+          "Batch-processing multiple requests in a single system call",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "When a virtual thread blocks (e.g., waiting for a DB response), the carrier unmounts it and picks up another runnable virtual thread — multiplexing without OS thread overhead.",
+      },
+      {
+        question: "To detect pinning in production, the JVM flag to use is:",
+        options: [
+          "-XX:+PrintCompilation",
+          "-Djdk.tracePinnedThreads=full",
+          "-XX:+UseVirtualThreads",
+          "-Djava.util.concurrent.ForkJoinPool.common.parallelism=1",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "-Djdk.tracePinnedThreads=full prints a stack trace whenever a virtual thread is pinned, letting you identify synchronized blocks holding blocking calls.",
+      },
+      {
+        question: "Compared to reactive programming (e.g. WebFlux), virtual threads offer:",
+        options: [
+          "Better throughput for all workloads",
+          "Synchronous, blocking code style with similar scalability — no callback chains or reactive operators needed",
+          "Lower memory usage in all cases",
+          "Built-in back-pressure handling",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Virtual threads let you write simple blocking code that scales like reactive. Reactive still wins for explicit back-pressure and complex async pipelines.",
+      },
+    ],
+  },
+
+  // ============================================================
+  // KOTLIN
+  // ============================================================
+  {
+    languageSlug: "kotlin",
+    topicTitle: "Coroutines and structured concurrency",
+    title: "Coroutines essentials",
+    description: "Scopes, jobs, cancellation, and structured concurrency.",
+    questions: [
+      {
+        question: "Inside coroutineScope { … }, if one child throws:",
+        options: [
+          "Only that child fails; siblings keep running",
+          "All siblings are cancelled and the exception propagates out of coroutineScope",
+          "The exception is silently swallowed",
+          "The parent supervises and restarts the child",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "coroutineScope cancels siblings on failure. Use supervisorScope if you want sibling-independent failure.",
+      },
+      {
+        question: "The fundamental difference between launch and async is:",
+        options: [
+          "launch is faster than async",
+          "launch returns a Job (fire-and-forget); async returns a Deferred you can await",
+          "async runs on the IO dispatcher; launch on Default",
+          "launch is suspending, async is not",
+        ],
+        correctAnswer: 1,
+        explanation: "Both spawn a coroutine. async carries a result; launch does not.",
+      },
+      {
+        question: "Why is GlobalScope discouraged in application code?",
+        options: [
+          "It only supports Dispatchers.IO",
+          "It is not part of structured concurrency — coroutines launched there leak if the surrounding work is cancelled",
+          "It is deprecated",
+          "It cannot run on Android",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "GlobalScope outlives all parents. Use an explicit CoroutineScope tied to the lifetime of the work.",
+      },
+      {
+        question: "withContext(Dispatchers.IO) { … } primarily exists to:",
+        options: [
+          "Start a new coroutine in the background",
+          "Switch the dispatcher for the duration of the block, then switch back",
+          "Catch I/O exceptions",
+          "Replace runBlocking in production code",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "withContext changes the dispatcher (and other CoroutineContext elements) only for the body and returns its result.",
+      },
+      {
+        question: "A cooperatively cancellable suspending function must:",
+        options: [
+          "Throw CancellationException manually at the end",
+          "Periodically call suspending functions (or yield()) so cancellation can be observed",
+          "Wrap its body in try/catch",
+          "Set Job.cancel(true)",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Coroutines check for cancellation at suspension points. CPU-bound loops should call yield() or ensureActive().",
+      },
+      {
+        question: "StateFlow differs from SharedFlow primarily in that:",
+        options: [
+          "StateFlow has no replay cache; SharedFlow always replays all values",
+          "StateFlow always holds and replays the latest value; SharedFlow is configurable and has no mandatory current value",
+          "SharedFlow is cold; StateFlow is hot",
+          "StateFlow can only be used on Android",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "StateFlow is a hot flow with a mandatory current value (replay=1, no buffer). SharedFlow is configurable for various replay/buffer strategies.",
+      },
+      {
+        question: "Flow<T> is cold, meaning:",
+        options: [
+          "The flow emits values before any collector subscribes",
+          "The producer code inside flow { } runs fresh for each new collector",
+          "Cold flows are automatically cancelled when the scope ends",
+          "Cold flows cannot be shared between multiple collectors",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Each call to collect {} re-executes the producer body. Use shareIn or stateIn to make a flow hot and share it.",
+      },
+      {
+        question: "CoroutineExceptionHandler is invoked for:",
+        options: [
+          "Every exception thrown inside any coroutine",
+          "Uncaught exceptions in root coroutines launched with launch (not async)",
+          "Exceptions in async coroutines when await() is called",
+          "Exceptions swallowed by supervisorScope",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "CEH handles uncaught exceptions in top-level launch coroutines. async exceptions are delivered at await(). It's a last-resort handler, not a substitute for try/catch.",
+      },
+      {
+        question: "Mutex in coroutines (kotlinx.coroutines.sync.Mutex) compared to synchronized() is:",
+        options: [
+          "Identical — both block the thread",
+          "Suspending instead of blocking — the coroutine suspends on lock() and frees the thread for other work",
+          "Non-reentrant and blocking like synchronized",
+          "Faster because it uses hardware CAS",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Coroutine Mutex is suspension-based: a waiting coroutine is parked (not thread-blocked), keeping the thread free for other coroutines.",
+      },
+      {
+        question: "runBlocking { } is appropriate:",
+        options: [
+          "In production server code to bridge async and sync APIs",
+          "In main() functions and test code to bridge coroutines with blocking entry points",
+          "Inside a suspending function to run nested coroutines faster",
+          "Anywhere GlobalScope is discouraged",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "runBlocking bridges blocking and suspending worlds by blocking the current thread. In production servers, using it inside a coroutine defeats the purpose of non-blocking I/O.",
+      },
+    ],
+  },
+
+  // ============================================================
+  // GO
+  // ============================================================
+  {
+    languageSlug: "golang",
+    topicTitle: "Goroutine scheduler (G-M-P)",
+    title: "Goroutines and the scheduler",
+    description: "The G-M-P model, blocking syscalls, and work stealing.",
+    questions: [
+      {
+        question: "In Go's G-M-P scheduler, P stands for:",
+        options: [
+          "Process",
+          "Processor — a logical resource that owns a runnable queue",
+          "Pthread",
+          "Priority",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "P represents a scheduling context; GOMAXPROCS controls how many P's exist.",
+      },
+      {
+        question: "When a goroutine makes a blocking syscall:",
+        options: [
+          "All goroutines pause until it returns",
+          "The M is detached from its P, the P picks up another M to keep scheduling",
+          "The goroutine is killed",
+          "The scheduler runs in a busy loop",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "The runtime hands the P off so other goroutines on that P keep running. The original M waits with the goroutine.",
+      },
+      {
+        question: "Closing a nil channel:",
+        options: [
+          "Returns silently",
+          "Panics",
+          "Returns false on the next receive",
+          "Initializes the channel",
+        ],
+        correctAnswer: 1,
+        explanation: "Closing a nil channel — like sending on a closed channel — panics.",
+      },
+      {
+        question: "Which is the idiomatic way to wait for several goroutines to finish?",
+        options: [
+          "time.Sleep until you think they're done",
+          "A buffered channel with a count",
+          "sync.WaitGroup with Add/Done/Wait",
+          "runtime.Gosched in a loop",
+        ],
+        correctAnswer: 2,
+        explanation:
+          "WaitGroup is the standard primitive: Add(N) before launching, Done() at the end of each, Wait() in the parent.",
+      },
+      {
+        question: "Why is context.Context typically the FIRST parameter to a function?",
+        options: [
+          "Performance — the compiler optimizes it specially",
+          "Convention — to make cancellation/deadlines visible at every call site",
+          "It must be first for go vet to compile the code",
+          "Generics require it",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "It's a strong convention that lets readers see the cancellation story at a glance and lets tooling (linters) enforce it.",
+      },
+      {
+        question: "GOMAXPROCS defaults to:",
+        options: [
+          "1, regardless of hardware",
+          "The number of logical CPUs on the machine",
+          "The number of goroutines currently running",
+          "4, as a reasonable default for servers",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Since Go 1.5, GOMAXPROCS defaults to runtime.NumCPU(). Set it explicitly in containerized environments where CPU quota may differ from host CPUs.",
+      },
+      {
+        question: "In a select statement with multiple ready cases:",
+        options: [
+          "The first case listed is always chosen",
+          "One case is chosen uniformly at random",
+          "The default case is always chosen",
+          "All ready cases execute concurrently",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Go's select picks one ready case pseudo-randomly, preventing starvation of any single case.",
+      },
+      {
+        question: "A directional channel parameter chan<- T (send-only) is used to:",
+        options: [
+          "Improve performance by removing receive buffer overhead",
+          "Restrict callee to only sending, making intent explicit and preventing misuse",
+          "Allow the runtime to optimize channel allocation",
+          "Enable channel sharing across goroutines",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Directional channels enforce usage at compile time. Passing chan<- T to a producer and <-chan T to a consumer is idiomatic and self-documenting.",
+      },
+      {
+        question: "sync.Once guarantees:",
+        options: [
+          "The function runs at most once even under concurrent calls, and all callers see the result after it completes",
+          "The function runs exactly once per goroutine",
+          "The function is thread-safe to call without any synchronization",
+          "The function is re-executed if it panics",
+        ],
+        correctAnswer: 0,
+        explanation:
+          "sync.Once ensures exactly one execution. All concurrent callers block until the function returns. If it panics, Once considers it done and won't retry.",
+      },
+      {
+        question: "The 'defer' statement in Go executes:",
+        options: [
+          "Immediately when declared, before the surrounding function body continues",
+          "When the surrounding function returns, in LIFO order",
+          "When the goroutine is garbage collected",
+          "When explicitly triggered with runtime.RunDeferred()",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Deferred functions run in LIFO order when the enclosing function returns (normally or via panic). This makes cleanup (Close, Unlock) concise and panic-safe.",
+      },
+    ],
+  },
+  {
+    languageSlug: "golang",
+    topicTitle: "Errors as values",
+    title: "Errors in Go",
+    description: "Wrapping, sentinel errors, and when to use panic.",
+    questions: [
+      {
+        question: "errors.Is(err, target) returns true when:",
+        options: [
+          "err == target (pointer equality only)",
+          "err is target, OR err wraps target somewhere in its chain",
+          "err has the same Error() string as target",
+          "err implements a method named Is",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "errors.Is walks the chain via Unwrap() and also calls a custom Is method if present.",
+      },
+      {
+        question: "errors.As(err, &target) is used to:",
+        options: [
+          "Compare two errors by value",
+          "Extract a specific concrete error type from the chain into 'target'",
+          "Convert any error to a string",
+          "Suppress an error",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "errors.As walks the chain and assigns the first match of target's type to target.",
+      },
+      {
+        question: "fmt.Errorf with %w differs from %v / %s in that:",
+        options: [
+          "%w is faster",
+          "%w wraps the error so errors.Is/errors.As can find it later",
+          "%w hides the underlying error",
+          "%w panics on nil",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "%w wraps the original error, preserving the chain. %v / %s only format the message.",
+      },
+      {
+        question: "panic should typically be reserved for:",
+        options: [
+          "Validation errors from user input",
+          "Truly unrecoverable programmer errors (invariant violations) and during init for fatal misconfigurations",
+          "Any error that crosses a package boundary",
+          "Timeouts in network calls",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Errors are values for expected failures. panic is for invariant violations.",
+      },
+      {
+        question: "Which is the idiomatic Go way to define a sentinel error other packages can check?",
+        options: [
+          "var ErrNotFound = errors.New(\"not found\")",
+          "type NotFoundError struct{}; func (NotFoundError) Error() string { ... }",
+          "panic(\"not found\")",
+          "log.Fatal(\"not found\")",
+        ],
+        correctAnswer: 0,
+        explanation:
+          "Exported variables of type error, named ErrXxx, are the canonical sentinels (e.g. io.EOF, sql.ErrNoRows).",
+      },
+      {
+        question: "errors.Join (introduced in Go 1.20) is useful when:",
+        options: [
+          "You want to combine two error messages into one string",
+          "You have multiple independent errors (e.g. from parallel tasks) and want to return them all, unwrappable via errors.Is/As",
+          "You want to suppress all but the first error",
+          "You need to convert []error to a single sentinel",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "errors.Join creates an error whose Unwrap() []error method returns all wrapped errors, letting errors.Is/As search the full set.",
+      },
+      {
+        question: "In Go 1.20+, fmt.Errorf(\"%w … %w\", err1, err2) produces an error that:",
+        options: [
+          "Only wraps err1 (the second %w is a bug)",
+          "Wraps both err1 and err2; errors.Is/As searches both",
+          "Panics at runtime",
+          "Discards err2",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Go 1.20 extended %w to support multiple wrapping. The resulting error implements Unwrap() []error.",
+      },
+      {
+        question: "When should an HTTP handler return a 500 vs propagate the error as a value?",
+        options: [
+          "Always use 500 — HTTP handlers must never propagate errors",
+          "Return domain errors as structured responses (4xx); use 500 for unexpected internal failures — log the internal error, never leak internals to clients",
+          "Propagate all errors as-is to the client for transparency",
+          "Use panic/recover to handle all HTTP handler errors",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Client errors (not found, invalid input) get 4xx with a structured body. Unexpected internal failures get 500 with the error logged server-side, never exposed to clients.",
+      },
+      {
+        question: "A custom error type (struct implementing error) is preferred over a sentinel when:",
+        options: [
+          "You only need to signal that something went wrong",
+          "You need to carry additional context (e.g. status code, field name, retry-after duration) alongside the message",
+          "The error crosses package boundaries",
+          "You need errors.Is to match it",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Sentinel errors identify the kind of error. Custom types carry structured data callers can inspect, enabling richer error handling.",
+      },
+      {
+        question: "The conventional return order for a Go function returning (value, error) is:",
+        options: [
+          "(error, value) — errors first for visibility",
+          "(value, error) — value first, error last",
+          "Either order; the compiler enforces nothing",
+          "Always return a struct containing both",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Go convention is (result, error). The caller checks err != nil before using the result. This is enforced by convention, not the compiler.",
+      },
+    ],
+  },
+
+  // ============================================================
+  // PYTHON
+  // ============================================================
+  {
+    languageSlug: "python",
+    topicTitle: "The Global Interpreter Lock",
+    title: "GIL — what it does and doesn't do",
+    description: "When the GIL hurts you and when it doesn't.",
+    questions: [
+      {
+        question: "The GIL in CPython exists primarily to:",
+        options: [
+          "Make Python single-threaded",
+          "Protect CPython's reference counts and internal data structures from concurrent mutation",
+          "Improve performance on multi-core machines",
+          "Enable async/await",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "The GIL serializes access to interpreter state. CPython's reference counting isn't free-threaded.",
+      },
+      {
+        question: "Which workload benefits LEAST from multithreading in CPython?",
+        options: [
+          "Many concurrent HTTP requests (I/O-bound)",
+          "Reading many files from disk",
+          "A pure-Python tight loop computing primes (CPU-bound)",
+          "A NumPy matrix multiplication releasing the GIL",
+        ],
+        correctAnswer: 2,
+        explanation:
+          "CPU-bound pure-Python code is serialized by the GIL. Use multiprocessing or native extensions, or wait for PEP 703.",
+      },
+      {
+        question: "asyncio's event loop is:",
+        options: [
+          "Multi-threaded by default",
+          "Single-threaded; one task runs between awaits",
+          "A wrapper around multiprocessing",
+          "Identical to threading.Thread",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Asyncio is cooperative single-threaded concurrency. The GIL is barely an issue because only one task runs at a time anyway.",
+      },
+      {
+        question: "PEP 703 proposes:",
+        options: [
+          "A new GIL-free 3rd-party Python implementation",
+          "An opt-in CPython build that removes the GIL using per-object locking",
+          "Removing reference counting entirely",
+          "A faster JIT compiler",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "PEP 703 is the no-GIL CPython work by Sam Gross, accepted for experimental inclusion in 3.13.",
+      },
+      {
+        question: "Which call releases the GIL while running?",
+        options: [
+          "A pure-Python loop summing integers",
+          "A NumPy ufunc on a large array",
+          "list comprehension over a generator",
+          "json.dumps on a small dict",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Native extensions like NumPy release the GIL around their C-level work, allowing other Python threads to make progress.",
+      },
+      {
+        question: "multiprocessing.Pool vs ThreadPoolExecutor for CPU-bound work in CPython:",
+        options: [
+          "ThreadPoolExecutor is faster because threads share memory with no IPC overhead",
+          "multiprocessing.Pool is better — each process has its own GIL, achieving true parallelism",
+          "They have identical CPU performance due to Python optimizations",
+          "Neither can use more than one core",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Processes bypass the GIL entirely. Threads share the GIL, so CPU-bound threads compete for it and run one at a time.",
+      },
+      {
+        question: "The GIL is released during I/O operations (socket reads, file reads) because:",
+        options: [
+          "I/O operations don't touch Python objects, so the GIL isn't needed while waiting",
+          "The OS requires threads to release the GIL before syscalls",
+          "asyncio forces GIL release on all awaitable operations",
+          "Python 3.x automatically converts I/O to async",
+        ],
+        correctAnswer: 0,
+        explanation:
+          "CPython releases the GIL before entering a blocking syscall and reacquires it when the call returns, allowing other threads to run during the wait.",
+      },
+      {
+        question: "ctypes or cffi can release the GIL in C extension calls by:",
+        options: [
+          "Using the Py_BEGIN_ALLOW_THREADS / Py_END_ALLOW_THREADS macros around the C code",
+          "Marking the function as @nogil in Python",
+          "Running the function in a subprocess",
+          "GIL release is automatic for all ctypes calls",
+        ],
+        correctAnswer: 0,
+        explanation:
+          "C extensions manually release the GIL with Py_BEGIN_ALLOW_THREADS before CPU-intensive or blocking C code, then reacquire it with Py_END_ALLOW_THREADS.",
+      },
+      {
+        question: "Sub-interpreters (PEP 554, Python 3.12+) differ from multiprocessing in that:",
+        options: [
+          "Sub-interpreters share heap memory and can pass Python objects directly across interpreters",
+          "Sub-interpreters run in the same process with separate GILs (per-interpreter GIL), avoiding process fork overhead",
+          "Sub-interpreters are identical to multiprocessing.Process",
+          "Sub-interpreters remove the need for any locking primitives",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "PEP 684 gives each sub-interpreter its own GIL. They share the process but have isolated heaps — faster than forking but with limited object sharing.",
+      },
+      {
+        question: "concurrent.futures.ProcessPoolExecutor uses which IPC mechanism to pass results between processes?",
+        options: [
+          "Shared memory via mmap",
+          "Pickle serialization over a pipe/queue",
+          "JSON over a local socket",
+          "Direct memory references via ctypes pointers",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "ProcessPoolExecutor pickles arguments and results and transports them over multiprocessing Queues. Large objects are expensive — prefer shared memory or memory-mapped files for big data.",
+      },
+    ],
+  },
+  {
+    languageSlug: "python",
+    topicTitle: "asyncio fundamentals",
+    title: "asyncio essentials",
+    description: "Tasks, gather, TaskGroup, and cancellation.",
+    questions: [
+      {
+        question: "asyncio.gather(a, b) with return_exceptions=False:",
+        options: [
+          "Always waits for both, ignoring exceptions",
+          "Cancels b if a raises, and re-raises a's exception",
+          "Raises a TimeoutError immediately",
+          "Runs them sequentially",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "By default, the first exception cancels the others and propagates out of gather().",
+      },
+      {
+        question: "asyncio.TaskGroup (3.11+) compared to gather:",
+        options: [
+          "Identical behavior",
+          "Provides structured concurrency: siblings are cancelled on failure and errors are reported as an ExceptionGroup",
+          "Runs tasks sequentially",
+          "Is deprecated",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "TaskGroup uses async with; failures cancel siblings; collected exceptions are surfaced via ExceptionGroup.",
+      },
+      {
+        question: "Calling a blocking function (e.g. time.sleep) inside an async coroutine:",
+        options: [
+          "Yields control to the event loop",
+          "Blocks the event loop, preventing all other tasks from running",
+          "Is automatically converted to asyncio.sleep",
+          "Raises a RuntimeError",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "The event loop is single-threaded. Use asyncio.sleep, or move the blocking call into a thread via run_in_executor.",
+      },
+      {
+        question: "asyncio.Task.cancel() works by:",
+        options: [
+          "Killing the underlying OS thread",
+          "Raising CancelledError at the next await point in the coroutine",
+          "Setting a flag the coroutine must poll manually",
+          "Calling sys.exit()",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Cancellation is cooperative — it is delivered as an exception at the next suspension point.",
+      },
+      {
+        question: "Which is the correct way to limit concurrency of async tasks to N?",
+        options: [
+          "Use threading.Semaphore",
+          "Use asyncio.Semaphore inside each task before doing the work",
+          "Set GOMAXPROCS",
+          "Use multiprocessing.Pool(N)",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "asyncio.Semaphore is an awaitable that limits concurrent holders, perfect for bounding fan-out.",
+      },
+      {
+        question: "asyncio.shield(coro) protects a coroutine from cancellation by:",
+        options: [
+          "Running it in a separate thread that ignores CancelledError",
+          "Wrapping it so that if the outer task is cancelled, the inner coroutine continues running",
+          "Converting CancelledError to a TimeoutError",
+          "Suppressing all exceptions inside the coroutine",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "shield() lets the inner coroutine complete even if the outer task is cancelled. The outer await still raises CancelledError, but the inner work isn't interrupted.",
+      },
+      {
+        question: "An async generator differs from a regular async coroutine in that:",
+        options: [
+          "It uses await instead of yield",
+          "It yields values lazily with 'yield' and is iterated with 'async for'",
+          "It returns all values at once when awaited",
+          "It cannot be cancelled",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Async generators use 'yield' inside 'async def' and are consumed with 'async for', enabling lazy asynchronous streaming without loading everything into memory.",
+      },
+      {
+        question: "asyncio.Queue is useful in producer-consumer patterns because:",
+        options: [
+          "It supports multiprocessing across multiple cores",
+          "It provides a thread-safe, awaitable bounded buffer between async producers and consumers in the same event loop",
+          "It replaces asyncio.Semaphore for rate limiting",
+          "It serializes access to shared mutable state",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "asyncio.Queue lets producers put() and consumers get() with backpressure (maxsize) — all without blocking, within the same event loop.",
+      },
+      {
+        question: "uvloop improves asyncio performance by:",
+        options: [
+          "Removing the GIL for asyncio coroutines",
+          "Replacing the default Python event loop with a Cython-based implementation using libuv",
+          "Running the event loop on multiple threads",
+          "Pre-compiling coroutines to native code",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "uvloop is a drop-in replacement that wraps libuv (the same C library behind Node.js). It's 2–4× faster for I/O-bound async workloads.",
+      },
+      {
+        question: "An async context manager requires implementing:",
+        options: [
+          "__enter__ and __exit__",
+          "__aenter__ and __aexit__ (both async def)",
+          "__init__ and __del__",
+          "__call__ and __await__",
+        ],
+        correctAnswer: 1,
+        explanation:
+          "Async context managers implement __aenter__ (called on 'async with' entry) and __aexit__ (called on exit), both of which can await.",
+      },
+    ],
+  },
+];

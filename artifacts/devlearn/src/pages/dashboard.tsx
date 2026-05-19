@@ -89,52 +89,52 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="space-y-4">
-            {recent?.articles.map(article => (
+            {recent?.articles?.map(article => (
               <Card key={`art-${article.id}`} className="bg-card/30 backdrop-blur">
                 <CardHeader className="py-4">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-md">
+                      <div className="p-2 bg-primary/10 rounded-md shrink-0">
                         <BookOpen className="h-4 w-4 text-primary" />
                       </div>
-                      <span className="font-medium text-sm">New Article: {article.title}</span>
+                      <span className="font-medium text-sm">{article.title}</span>
                     </div>
                     <Link href={`/articles/${article.id}`}>
-                      <div className="cursor-pointer hover:underline text-xs text-muted-foreground">View Article</div>
+                      <div className="cursor-pointer hover:underline text-xs text-muted-foreground shrink-0">View Article</div>
                     </Link>
                   </div>
                 </CardHeader>
               </Card>
             ))}
-            {recent?.resources.map(resource => (
+            {recent?.resources?.map(resource => (
               <Card key={`res-${resource.id}`} className="bg-card/30 backdrop-blur">
                 <CardHeader className="py-4">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-md">
+                      <div className="p-2 bg-primary/10 rounded-md shrink-0">
                         <Library className="h-4 w-4 text-primary" />
                       </div>
-                      <span className="font-medium text-sm">New Resource: {resource.title}</span>
+                      <span className="font-medium text-sm">{resource.title}</span>
                     </div>
-                    <a href={resource.url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:underline">
+                    <a href={resource.url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:underline shrink-0">
                       Visit Link
                     </a>
                   </div>
                 </CardHeader>
               </Card>
             ))}
-            {recent?.quizzes.map(quiz => (
+            {recent?.quizzes?.map(quiz => (
               <Card key={`quiz-${quiz.id}`} className="bg-card/30 backdrop-blur">
                 <CardHeader className="py-4">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-md">
+                      <div className="p-2 bg-primary/10 rounded-md shrink-0">
                         <BrainCircuit className="h-4 w-4 text-primary" />
                       </div>
-                      <span className="font-medium text-sm">New Quiz: {quiz.title}</span>
+                      <span className="font-medium text-sm">{quiz.title}</span>
                     </div>
                     <Link href={`/quizzes/${quiz.id}`}>
-                      <div className="cursor-pointer hover:underline text-xs text-muted-foreground">Take Quiz</div>
+                      <div className="cursor-pointer hover:underline text-xs text-muted-foreground shrink-0">Take Quiz</div>
                     </Link>
                   </div>
                 </CardHeader>

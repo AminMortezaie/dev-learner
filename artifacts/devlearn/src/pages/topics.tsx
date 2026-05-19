@@ -113,7 +113,7 @@ export default function Topics() {
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="languageId"
@@ -183,7 +183,7 @@ export default function Topics() {
 
       <div className="flex gap-4 flex-wrap">
         <Select value={selectedLang} onValueChange={setSelectedLang}>
-          <SelectTrigger className="w-[200px] font-mono">
+          <SelectTrigger className="w-full sm:w-[200px] font-mono">
             <SelectValue placeholder="Filter by Language" />
           </SelectTrigger>
           <SelectContent>
@@ -195,7 +195,7 @@ export default function Topics() {
         </Select>
 
         <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-          <SelectTrigger className="w-[200px] font-mono">
+          <SelectTrigger className="w-full sm:w-[200px] font-mono">
             <SelectValue placeholder="Filter by Difficulty" />
           </SelectTrigger>
           <SelectContent>

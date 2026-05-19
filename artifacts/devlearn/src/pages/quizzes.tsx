@@ -28,7 +28,7 @@ export default function Quizzes() {
 
       <div className="flex gap-4 flex-wrap">
         <Select value={selectedLang} onValueChange={setSelectedLang}>
-          <SelectTrigger className="w-[200px] font-mono">
+          <SelectTrigger className="w-full sm:w-[200px] font-mono">
             <SelectValue placeholder="Filter by Language" />
           </SelectTrigger>
           <SelectContent>

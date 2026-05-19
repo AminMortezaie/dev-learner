@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetQuiz, useSubmitQuizAttempt } from "@workspace/api-client-react";
+import {
+  useGetQuiz,
+  useSubmitQuizAttempt,
+  getGetQuizQueryKey,
+} from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -13,7 +17,7 @@ export default function QuizView() {
   const quizId = parseInt(id!);
 
   const { data: quiz, isLoading } = useGetQuiz(quizId, {
-    query: { enabled: !!id }
+    query: { queryKey: getGetQuizQueryKey(quizId), enabled: !!id },
   });
 
   const submitAttempt = useSubmitQuizAttempt();
@@ -105,9 +109,9 @@ export default function QuizView() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center gap-4">
-              <div className="relative h-40 w-40 flex items-center justify-center rounded-full border-8 border-muted">
+              <div className="relative h-32 w-32 md:h-40 md:w-40 flex items-center justify-center rounded-full border-8 border-muted">
                 <div className="absolute inset-0 rounded-full border-8 border-primary rounded-full border-t-transparent -rotate-45" style={{ transform: `rotate(${(result.score / 100) * 360 - 45}deg)` }} />
-                <span className="text-4xl font-bold font-mono">{Math.round(result.score)}%</span>
+                <span className="text-2xl md:text-4xl font-bold font-mono">{Math.round(result.score)}%</span>
               </div>
               <Badge variant={result.passed ? "default" : "destructive"} className="text-lg px-4 py-1">
                 {result.passed ? "Passed" : "Needs Review"}

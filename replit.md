@@ -1,15 +1,25 @@
-# [Project name]
+# Dev-Learn-Hub
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A senior-developer learning platform: System Design, Java, Kotlin, Go, and Python — with curated topics, syntax lessons linked to real-world GitHub projects (Kubernetes, Docker, Spring, Ktor, FastAPI, …), articles, and senior-level quizzes. Adding an article auto-generates a quiz (OpenAI when `OPENAI_API_KEY` is set, deterministic fallback otherwise).
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+First-time setup:
+
+1. `docker compose up -d` — start Postgres 16 on `localhost:5432` (user/password/db = `devlearn`).
+2. `cp .env.example .env` and `export DATABASE_URL=postgres://devlearn:devlearn@localhost:5432/devlearn` (or `source .env`).
+3. `pnpm install`
+4. `pnpm --filter @workspace/db run push` — create tables.
+5. `pnpm --filter @workspace/api-server run seed` — populate with curated content.
+6. `pnpm --filter @workspace/api-server run dev` — start the API on port 5000.
+7. `pnpm --filter @workspace/devlearn run dev` — start the Vite frontend.
+
+Other commands:
+
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Optional env: `OPENAI_API_KEY` to enable real LLM article-quiz generation (`OPENAI_MODEL` defaults to `gpt-4o-mini`).
 
 ## Stack
 

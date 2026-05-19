@@ -1,27 +1,46 @@
-import { Router, type IRouter } from "express";
-import { db, languagesTable, topicsTable, resourcesTable, syntaxLessonsTable, quizzesTable } from "@workspace/db";
-import { eq, count, sql } from "drizzle-orm";
+import { Router } from "express";
+import { sql, eq } from "drizzle-orm";
+import {
+  db,
+  languagesTable,
+  topicsTable,
+  resourcesTable,
+  syntaxLessonsTable,
+} from "@workspace/db";
+import { asyncHandler } from "../lib/async.ts";
 
-const router: IRouter = Router();
+export const languagesRouter = Router();
 
-router.get("/languages", async (req, res): Promise<void> => {
-  const langs = await db.select().from(languagesTable).orderBy(languagesTable.id);
+languagesRouter.get(
+  "/languages",
+  asyncHandler(async (_req, res) => {
+    const langs = await db.select().from(languagesTable).orderBy(languagesTable.id);
 
-  const withCounts = await Promise.all(
-    langs.map(async (lang) => {
-      const [topicCount] = await db.select({ count: count() }).from(topicsTable).where(eq(topicsTable.languageId, lang.id));
-      const [resourceCount] = await db.select({ count: count() }).from(resourcesTable).where(eq(resourcesTable.languageId, lang.id));
-      const [lessonCount] = await db.select({ count: count() }).from(syntaxLessonsTable).where(eq(syntaxLessonsTable.languageId, lang.id));
-      return {
-        ...lang,
-        topicCount: topicCount?.count ?? 0,
-        resourceCount: resourceCount?.count ?? 0,
-        lessonCount: lessonCount?.count ?? 0,
-      };
-    })
-  );
+    // N+1 is fine for ~5 languages; switch to a single grouped query if this grows.
+    const enriched = await Promise.all(
+      langs.map(async (l) => {
+        const [topics] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(topicsTable)
+          .where(eq(topicsTable.languageId, l.id));
+        const [resources] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(resourcesTable)
+          .where(eq(resourcesTable.languageId, l.id));
+        const [lessons] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(syntaxLessonsTable)
+          .where(eq(syntaxLessonsTable.languageId, l.id));
+        return {
+          ...l,
+          createdAt: l.createdAt ? l.createdAt.toISOString() : null,
+          topicCount: topics?.c ?? 0,
+          resourceCount: resources?.c ?? 0,
+          lessonCount: lessons?.c ?? 0,
+        };
+      }),
+    );
 
-  res.json(withCounts);
-});
-
-export default router;
+    res.json(enriched);
+  }),
+);

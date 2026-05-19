@@ -47,3 +47,11 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+.junie
+
+# Environment variables (never commit real secrets)
+.env
+.env.local
+.env.*.local
+/.claude/
+/.pnpm-store/
