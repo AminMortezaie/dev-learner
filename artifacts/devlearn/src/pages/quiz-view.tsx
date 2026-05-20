@@ -109,9 +109,20 @@ export default function QuizView() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center gap-4">
-              <div className="relative h-32 w-32 md:h-40 md:w-40 flex items-center justify-center rounded-full border-8 border-muted">
-                <div className="absolute inset-0 rounded-full border-8 border-primary rounded-full border-t-transparent -rotate-45" style={{ transform: `rotate(${(result.score / 100) * 360 - 45}deg)` }} />
-                <span className="text-2xl md:text-4xl font-bold font-mono">{Math.round(result.score)}%</span>
+              <div className="relative flex items-center justify-center">
+                <svg width="140" height="140" viewBox="0 0 140 140">
+                  <circle cx="70" cy="70" r="58" fill="none" strokeWidth="12" className="stroke-muted" />
+                  <circle
+                    cx="70" cy="70" r="58" fill="none" strokeWidth="12"
+                    strokeLinecap="round"
+                    className="stroke-primary"
+                    strokeDasharray={`${2 * Math.PI * 58}`}
+                    strokeDashoffset={`${2 * Math.PI * 58 * (1 - result.score / 100)}`}
+                    transform="rotate(-90 70 70)"
+                    style={{ transition: "stroke-dashoffset 0.6s ease" }}
+                  />
+                </svg>
+                <span className="absolute text-2xl md:text-3xl font-bold font-mono">{Math.round(result.score)}%</span>
               </div>
               <Badge variant={result.passed ? "default" : "destructive"} className="text-lg px-4 py-1">
                 {result.passed ? "Passed" : "Needs Review"}
