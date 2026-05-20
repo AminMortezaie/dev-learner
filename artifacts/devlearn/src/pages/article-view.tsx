@@ -223,19 +223,17 @@ export default function ArticleView() {
 
   useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
 
-  const handleListen = () => {
+  // fromSegIdx: -1 = start from title, 0+ = start from that content segment
+  const startTTS = (fromSegIdx: number) => {
     const synth = window.speechSynthesis;
     if (!synth) return;
-    if (ttsState === "playing") { synth.pause(); setTtsState("paused"); return; }
-    if (ttsState === "paused") { synth.resume(); setTtsState("playing"); return; }
 
     synth.cancel();
-    setActiveSegIdx(-1);
 
     const voice = pickVoice(synth.getVoices());
     const segTexts = contentSegments.map(s => stripMarkdownForSpeech(s)).filter(s => s.trim());
-    // title first, then each paragraph as its own utterance
     const allParts: string[] = [article!.title, ...segTexts];
+    const startIdx = fromSegIdx + 1; // +1 because idx 0 is the title
 
     const speakAt = (idx: number) => {
       if (idx >= allParts.length) {
@@ -244,14 +242,13 @@ export default function ArticleView() {
         return;
       }
 
-      const segIdx = idx - 1; // -1 = title (no highlight), 0+ = content segments
+      const segIdx = idx - 1;
       setActiveSegIdx(segIdx);
       if (segIdx >= 0) {
         const el = segRefs.current[segIdx];
         if (el) {
           const { top, bottom } = el.getBoundingClientRect();
           const vh = window.innerHeight;
-          // Only scroll if the paragraph isn't already in a comfortable reading zone
           if (top < 80 || bottom > vh - 80) {
             el.scrollIntoView({ behavior: "smooth", block: "start" });
           }
@@ -276,8 +273,21 @@ export default function ArticleView() {
       synth.speak(utt);
     };
 
-    speakAt(0);
+    speakAt(startIdx);
     setTtsState("playing");
+  };
+
+  const handleListen = () => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    if (ttsState === "playing") { synth.pause(); setTtsState("paused"); return; }
+    if (ttsState === "paused") { synth.resume(); setTtsState("playing"); return; }
+    setActiveSegIdx(-1);
+    startTTS(-1);
+  };
+
+  const handleSegmentClick = (segIdx: number) => {
+    startTTS(segIdx);
   };
 
   const handleStop = () => {
@@ -401,8 +411,11 @@ export default function ArticleView() {
           <div
             key={i}
             ref={el => { segRefs.current[i] = el; }}
-            className={`transition-colors duration-300 rounded-md -mx-2 px-2 scroll-mt-20 ${
-              activeSegIdx === i ? "bg-yellow-400/20 dark:bg-yellow-400/15 ring-1 ring-yellow-400/40" : ""
+            onClick={() => handleSegmentClick(i)}
+            className={`transition-colors duration-300 rounded-md -mx-2 px-2 scroll-mt-20 cursor-pointer ${
+              activeSegIdx === i
+                ? "bg-yellow-400/20 dark:bg-yellow-400/15 ring-1 ring-yellow-400/40"
+                : "hover:bg-muted/50"
             }`}
           >
             {renderMarkdown(seg)}
