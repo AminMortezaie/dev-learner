@@ -61,15 +61,17 @@ articlesRouter.get(
   }),
 );
 
+const createArticleSchema = insertArticleSchema.extend({
+  quizCount: z.coerce.number().int().min(1).max(20).optional(),
+});
+
 articlesRouter.post(
   "/articles",
   asyncHandler(async (req, res) => {
-    const input = insertArticleSchema.parse(req.body);
-    const [article] = await db.insert(articlesTable).values(input).returning();
+    const { quizCount, ...articleData } = createArticleSchema.parse(req.body);
+    const [article] = await db.insert(articlesTable).values(articleData).returning();
     if (!article) throw new HttpError(500, "Failed to create article");
 
-    // Auto-generate a quiz for the article. Always create a quiz row, even if
-    // generation fails entirely (defensive fallback inside generator).
     let languageName: string | null = null;
     if (article.languageId != null) {
       const [lang] = await db
@@ -83,6 +85,7 @@ articlesRouter.post(
       title: article.title,
       content: article.content,
       language: languageName,
+      count: quizCount,
     });
 
     const [quiz] = await db

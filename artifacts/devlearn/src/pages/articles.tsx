@@ -23,6 +23,7 @@ const articleSchema = z.object({
   content: z.string().min(1, "Content is required"),
   languageId: z.coerce.number().optional(),
   tags: z.string().optional(),
+  quizCount: z.coerce.number().int().min(1).max(20).optional(),
 });
 
 export default function Articles() {
@@ -44,12 +45,12 @@ export default function Articles() {
 
   const form = useForm<z.infer<typeof articleSchema>>({
     resolver: zodResolver(articleSchema),
-    defaultValues: { title: "", summary: "", content: "", tags: "" },
+    defaultValues: { title: "", summary: "", content: "", tags: "", quizCount: 10 },
   });
 
   const onSubmit = (data: z.infer<typeof articleSchema>) => {
     createArticle.mutate(
-      { data: { ...data, languageId: data.languageId || null } as any },
+      { data: { ...data, languageId: data.languageId || null, quizCount: data.quizCount ?? 10 } as any },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListArticlesQueryKey() });
@@ -111,7 +112,7 @@ export default function Articles() {
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="languageId"
@@ -142,6 +143,19 @@ export default function Articles() {
                         <FormLabel>Tags (comma separated)</FormLabel>
                         <FormControl>
                           <Input placeholder="internals, advanced" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="quizCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quiz Questions</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={1} max={20} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
