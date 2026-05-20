@@ -218,9 +218,7 @@ export default function ArticleView() {
   const [activeSegIdx, setActiveSegIdx] = useState(-1);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const segRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const segOffsetsRef = useRef<{ start: number; end: number }[]>([]);
 
-  // Split content into paragraphs/blocks for per-segment highlighting
   const contentSegments = article ? article.content.split(/\n\n+/).filter(s => s.trim()) : [];
 
   useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
@@ -234,38 +232,43 @@ export default function ArticleView() {
     synth.cancel();
     setActiveSegIdx(-1);
 
-    // Build spoken text and track each segment's char range within it
-    const titlePart = `${article!.title}. `;
-    const segTexts = contentSegments.map(s => stripMarkdownForSpeech(s));
-    const fullText = titlePart + segTexts.join(" ");
-
-    let offset = titlePart.length;
-    segOffsetsRef.current = segTexts.map(t => {
-      const start = offset;
-      offset += t.length + 1;
-      return { start, end: offset - 1 };
-    });
-
-    const utt = new SpeechSynthesisUtterance(fullText);
     const voice = pickVoice(synth.getVoices());
-    if (voice) utt.voice = voice;
-    utt.rate = 1.0;
-    utt.pitch = 1.0;
+    const segTexts = contentSegments.map(s => stripMarkdownForSpeech(s)).filter(s => s.trim());
+    // title first, then each paragraph as its own utterance
+    const allParts: string[] = [article!.title, ...segTexts];
 
-    utt.addEventListener("boundary", (e: SpeechSynthesisEvent) => {
-      if (e.name !== "word") return;
-      const ci = e.charIndex;
-      const idx = segOffsetsRef.current.findIndex(o => ci >= o.start && ci <= o.end);
-      if (idx !== -1) {
-        setActiveSegIdx(idx);
-        segRefs.current[idx]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const speakAt = (idx: number) => {
+      if (idx >= allParts.length) {
+        setTtsState("idle");
+        setActiveSegIdx(-1);
+        return;
       }
-    });
 
-    utt.onend = () => { setTtsState("idle"); setActiveSegIdx(-1); };
-    utt.onerror = () => { setTtsState("idle"); setActiveSegIdx(-1); };
-    utteranceRef.current = utt;
-    synth.speak(utt);
+      const segIdx = idx - 1; // -1 = title (no highlight), 0+ = content segments
+      setActiveSegIdx(segIdx);
+      if (segIdx >= 0) {
+        segRefs.current[segIdx]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      const utt = new SpeechSynthesisUtterance(allParts[idx]!);
+      if (voice) utt.voice = voice;
+      utt.rate = 1.0;
+      utt.pitch = 1.0;
+      utt.onend = () => speakAt(idx + 1);
+      utt.onerror = (e) => {
+        const err = (e as SpeechSynthesisErrorEvent).error;
+        if (err !== "canceled" && err !== "interrupted") {
+          setTtsState("idle");
+          setActiveSegIdx(-1);
+        }
+      };
+      utteranceRef.current = utt;
+      synth.speak(utt);
+    };
+
+    speakAt(0);
     setTtsState("playing");
   };
 
