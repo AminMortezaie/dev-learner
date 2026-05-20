@@ -13,6 +13,17 @@ if (import.meta.env.PROD && import.meta.env.VITE_API_URL) {
   setBaseUrl(import.meta.env.VITE_API_URL as string);
 }
 
+// When the service worker activates a new version, reload all open tabs so
+// users always see the latest build without needing a manual refresh.
+if ("serviceWorker" in navigator) {
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+}
+
 // Pages placeholder
 import Dashboard from "@/pages/dashboard";
 import Topics from "@/pages/topics";
