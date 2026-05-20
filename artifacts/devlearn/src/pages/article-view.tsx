@@ -215,7 +215,13 @@ export default function ArticleView() {
   });
 
   const [ttsState, setTtsState] = useState<"idle" | "playing" | "paused">("idle");
+  const [activeSegIdx, setActiveSegIdx] = useState(-1);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const segRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const segOffsetsRef = useRef<{ start: number; end: number }[]>([]);
+
+  // Split content into paragraphs/blocks for per-segment highlighting
+  const contentSegments = article ? article.content.split(/\n\n+/).filter(s => s.trim()) : [];
 
   useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
 
@@ -226,14 +232,38 @@ export default function ArticleView() {
     if (ttsState === "paused") { synth.resume(); setTtsState("playing"); return; }
 
     synth.cancel();
-    const text = `${article!.title}. ${stripMarkdownForSpeech(article!.content)}`;
-    const utt = new SpeechSynthesisUtterance(text);
+    setActiveSegIdx(-1);
+
+    // Build spoken text and track each segment's char range within it
+    const titlePart = `${article!.title}. `;
+    const segTexts = contentSegments.map(s => stripMarkdownForSpeech(s));
+    const fullText = titlePart + segTexts.join(" ");
+
+    let offset = titlePart.length;
+    segOffsetsRef.current = segTexts.map(t => {
+      const start = offset;
+      offset += t.length + 1;
+      return { start, end: offset - 1 };
+    });
+
+    const utt = new SpeechSynthesisUtterance(fullText);
     const voice = pickVoice(synth.getVoices());
     if (voice) utt.voice = voice;
     utt.rate = 1.0;
     utt.pitch = 1.0;
-    utt.onend = () => setTtsState("idle");
-    utt.onerror = () => setTtsState("idle");
+
+    utt.addEventListener("boundary", (e: SpeechSynthesisEvent) => {
+      if (e.name !== "word") return;
+      const ci = e.charIndex;
+      const idx = segOffsetsRef.current.findIndex(o => ci >= o.start && ci <= o.end);
+      if (idx !== -1) {
+        setActiveSegIdx(idx);
+        segRefs.current[idx]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+
+    utt.onend = () => { setTtsState("idle"); setActiveSegIdx(-1); };
+    utt.onerror = () => { setTtsState("idle"); setActiveSegIdx(-1); };
     utteranceRef.current = utt;
     synth.speak(utt);
     setTtsState("playing");
@@ -242,6 +272,7 @@ export default function ArticleView() {
   const handleStop = () => {
     window.speechSynthesis?.cancel();
     setTtsState("idle");
+    setActiveSegIdx(-1);
   };
 
   const handleGenerateQuiz = async () => {
@@ -355,7 +386,17 @@ export default function ArticleView() {
       </div>
 
       <div className="prose prose-sm md:prose-base dark:prose-invert prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-border max-w-none">
-        {renderMarkdown(article.content)}
+        {contentSegments.map((seg, i) => (
+          <div
+            key={i}
+            ref={el => { segRefs.current[i] = el; }}
+            className={`transition-colors duration-300 rounded-md ${
+              activeSegIdx === i ? "bg-yellow-400/20 dark:bg-yellow-400/15 -mx-2 px-2 ring-1 ring-yellow-400/40" : ""
+            }`}
+          >
+            {renderMarkdown(seg)}
+          </div>
+        ))}
       </div>
 
       <div className="mt-16 p-4 md:p-8 border border-border bg-card/50 rounded-xl text-center">
