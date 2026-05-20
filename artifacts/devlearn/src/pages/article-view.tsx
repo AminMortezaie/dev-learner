@@ -244,7 +244,7 @@ export default function ArticleView() {
           )}
         </div>
         
-        <h1 className="text-4xl font-bold tracking-tight">{article.title}</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-tight">{article.title}</h1>
         
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground font-mono mt-4">
           <div className="flex items-center">
@@ -260,7 +260,7 @@ export default function ArticleView() {
         </div>
       </div>
 
-      <div className="prose dark:prose-invert prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-border max-w-none">
+      <div className="prose prose-sm md:prose-base dark:prose-invert prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-border max-w-none">
         {renderMarkdown(article.content)}
       </div>
 

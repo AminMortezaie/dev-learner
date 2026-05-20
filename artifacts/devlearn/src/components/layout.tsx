@@ -73,12 +73,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-bold text-base font-mono">DevLearn_</span>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="text-xs px-2 py-1 border border-border rounded text-muted-foreground hover:bg-accent"
-            >
-              {theme === "dark" ? "Light" : "Dark"}
-            </button>
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9">
