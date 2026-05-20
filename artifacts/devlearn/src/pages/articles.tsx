@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListArticles, useListLanguages, useCreateArticle, useDeleteArticle, useImportArticleFromUrl, usePolishContent, getListArticlesQueryKey } from "@workspace/api-client-react";
+import { useListArticles, useListLanguages, useCreateArticle, useDeleteArticle, usePolishContent, getListArticlesQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -25,15 +25,9 @@ const articleSchema = z.object({
   tags: z.string().optional(),
 });
 
-const fromUrlSchema = z.object({
-  url: z.string().url("Must be a valid URL"),
-  languageId: z.coerce.number().optional(),
-});
-
 export default function Articles() {
   const [selectedLang, setSelectedLang] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -46,17 +40,11 @@ export default function Articles() {
   const { data: articles, isLoading } = useListArticles(params);
   const createArticle = useCreateArticle();
   const deleteArticle = useDeleteArticle();
-  const importFromUrl = useImportArticleFromUrl();
   const polishMutation = usePolishContent();
 
   const form = useForm<z.infer<typeof articleSchema>>({
     resolver: zodResolver(articleSchema),
     defaultValues: { title: "", summary: "", content: "", tags: "" },
-  });
-
-  const urlForm = useForm<z.infer<typeof fromUrlSchema>>({
-    resolver: zodResolver(fromUrlSchema),
-    defaultValues: { url: "" },
   });
 
   const onSubmit = (data: z.infer<typeof articleSchema>) => {
@@ -72,27 +60,6 @@ export default function Articles() {
         onError: () => {
           toast({ title: "Failed to create article", variant: "destructive" });
         }
-      }
-    );
-  };
-
-  const onImportFromUrl = (data: z.infer<typeof fromUrlSchema>) => {
-    importFromUrl.mutate(
-      { url: data.url, languageId: data.languageId || undefined },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListArticlesQueryKey() });
-          toast({ title: "Article imported and quiz generated!" });
-          setIsAiDialogOpen(false);
-          urlForm.reset();
-        },
-        onError: (err: any) => {
-          toast({
-            title: "Import failed",
-            description: err?.message ?? "Could not import from URL",
-            variant: "destructive",
-          });
-        },
       }
     );
   };
@@ -120,73 +87,11 @@ export default function Articles() {
           <h1 className="text-3xl font-bold tracking-tight font-mono">/articles</h1>
           <p className="text-muted-foreground">Deep dive technical articles and guides.</p>
         </div>
-        
-        <div className="flex gap-2">
-          <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="font-mono">
-                <Sparkles className="mr-2 h-4 w-4" /> Add by AI
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle className="font-mono">Import from URL</DialogTitle>
-              </DialogHeader>
-              <p className="text-sm text-muted-foreground">
-                Paste any article or blog post URL. AI will extract the content,
-                generate a structured article, and create a quiz automatically.
-              </p>
-              <Form {...urlForm}>
-                <form onSubmit={urlForm.handleSubmit(onImportFromUrl)} className="space-y-4">
-                  <FormField
-                    control={urlForm.control}
-                    name="url"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={urlForm.control}
-                    name="languageId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Language (optional)</FormLabel>
-                        <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Auto-detect" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {languages?.map(l => (
-                              <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full font-mono" disabled={importFromUrl.isPending}>
-                    {importFromUrl.isPending ? "Importing & generating quiz..." : (
-                      <><Sparkles className="mr-2 h-4 w-4" /> Import & Generate Quiz</>
-                    )}
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="font-mono"><Plus className="mr-2 h-4 w-4" /> Write Article</Button>
-            </DialogTrigger>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="font-mono"><Plus className="mr-2 h-4 w-4" /> Write Article</Button>
+          </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="font-mono">Draft New Article</DialogTitle>
@@ -296,8 +201,7 @@ export default function Articles() {
               </form>
             </Form>
           </DialogContent>
-          </Dialog>
-        </div>
+        </Dialog>
       </div>
 
       <div className="flex gap-4 flex-wrap">

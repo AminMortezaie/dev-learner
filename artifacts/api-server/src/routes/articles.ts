@@ -11,7 +11,7 @@ import {
 import { asyncHandler } from "../lib/async.ts";
 import { HttpError } from "../lib/errors.ts";
 import { parseIntParam, parseOptionalInt } from "../lib/parse.ts";
-import { generateQuizFromArticle, generateArticleFromUrl, polishContent } from "../lib/openai-quiz.ts";
+import { generateQuizFromArticle, polishContent } from "../lib/openai-quiz.ts";
 import * as z from "zod";
 
 export const articlesRouter = Router();
@@ -116,75 +116,6 @@ articlesRouter.post(
   }),
 );
 
-const fromUrlSchema = z.object({
-  url: z.string().url(),
-  languageId: z.coerce.number().int().optional(),
-});
-
-articlesRouter.post(
-  "/articles/from-url",
-  asyncHandler(async (req, res) => {
-    const { url, languageId } = fromUrlSchema.parse(req.body);
-
-    const generated = await generateArticleFromUrl(url);
-
-    const [article] = await db
-      .insert(articlesTable)
-      .values({
-        title: generated.title,
-        content: generated.content,
-        summary: generated.summary,
-        tags: generated.tags,
-        languageId: languageId ?? null,
-      })
-      .returning();
-    if (!article) throw new HttpError(500, "Failed to create article");
-
-    let languageName: string | null = null;
-    if (article.languageId != null) {
-      const [lang] = await db
-        .select({ name: languagesTable.name })
-        .from(languagesTable)
-        .where(eq(languagesTable.id, article.languageId));
-      languageName = lang?.name ?? null;
-    }
-
-    const questions = await generateQuizFromArticle({
-      title: article.title,
-      content: article.content,
-      language: languageName,
-    });
-
-    const [quiz] = await db
-      .insert(quizzesTable)
-      .values({
-        title: `Quiz: ${article.title}`,
-        description: `Auto-generated from article #${article.id}`,
-        articleId: article.id,
-        languageId: article.languageId ?? null,
-      })
-      .returning();
-    if (quiz && questions.length > 0) {
-      await db.insert(quizQuestionsTable).values(
-        questions.map((q, i) => ({
-          quizId: quiz.id,
-          question: q.question,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation,
-          orderIndex: i,
-        })),
-      );
-    }
-
-    const [row] = await db
-      .select(articleSelect)
-      .from(articlesTable)
-      .leftJoin(languagesTable, eq(languagesTable.id, articlesTable.languageId))
-      .where(eq(articlesTable.id, article.id));
-    res.status(201).json(await serializeArticle(row!));
-  }),
-);
 
 const polishSchema = z.object({ content: z.string().min(1) });
 

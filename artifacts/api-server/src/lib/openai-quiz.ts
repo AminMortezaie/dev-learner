@@ -29,13 +29,6 @@ export interface GenerateOptions {
   count?: number;
 }
 
-export interface GeneratedArticle {
-  title: string;
-  content: string;
-  summary: string;
-  tags: string;
-}
-
 const DEFAULT_COUNT = 10;
 
 function resolveAiConfig(): { apiKey: string; baseUrl: string; model: string } | null {
@@ -105,84 +98,7 @@ export async function generateQuizFromArticle(
 }
 
 // ---------------------------------------------------------------------------
-// HTML → Markdown converter (no AI needed — 100% complete, no token limits)
-// ---------------------------------------------------------------------------
-
-function htmlToMarkdown(html: string): string {
-  return html
-    // Remove noise blocks
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<svg[\s\S]*?<\/svg>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    // Headings
-    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, t) => `\n# ${stripTags(t).trim()}\n`)
-    .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, t) => `\n## ${stripTags(t).trim()}\n`)
-    .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, t) => `\n### ${stripTags(t).trim()}\n`)
-    .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, (_, t) => `\n#### ${stripTags(t).trim()}\n`)
-    .replace(/<h5[^>]*>([\s\S]*?)<\/h5>/gi, (_, t) => `\n##### ${stripTags(t).trim()}\n`)
-    .replace(/<h6[^>]*>([\s\S]*?)<\/h6>/gi, (_, t) => `\n###### ${stripTags(t).trim()}\n`)
-    // Code blocks
-    .replace(/<pre[^>]*><code[^>]*class="[^"]*language-([^"]+)"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
-      (_, lang, code) => `\n\`\`\`${lang}\n${decodeEntities(code).trim()}\n\`\`\`\n`)
-    .replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
-      (_, code) => `\n\`\`\`\n${decodeEntities(code).trim()}\n\`\`\`\n`)
-    .replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi,
-      (_, code) => `\n\`\`\`\n${decodeEntities(stripTags(code)).trim()}\n\`\`\`\n`)
-    // Inline code
-    .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, (_, t) => `\`${decodeEntities(t)}\``)
-    // Bold / italic
-    .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, (_, t) => `**${stripTags(t)}**`)
-    .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, (_, t) => `**${stripTags(t)}**`)
-    .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, (_, t) => `*${stripTags(t)}*`)
-    .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, (_, t) => `*${stripTags(t)}*`)
-    // Blockquote
-    .replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi,
-      (_, t) => `\n> ${stripTags(t).trim().replace(/\n/g, "\n> ")}\n`)
-    // Links — keep link text only
-    .replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, (_, t) => stripTags(t))
-    // Lists
-    .replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_: string, body: string) =>
-      "\n" + body.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_2: string, item: string) => `- ${stripTags(item).trim()}\n`) + "\n")
-    .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_: string, body: string) => {
-      let n = 0;
-      return "\n" + body.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_2: string, item: string) => `${++n}. ${stripTags(item).trim()}\n`) + "\n";
-    })
-    // Paragraphs and line breaks
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_, t) => `\n${stripTags(t).trim()}\n`)
-    .replace(/<hr\s*\/?>/gi, "\n---\n")
-    // Strip remaining tags
-    .replace(/<[^>]+>/g, "")
-    // Decode entities
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–")
-    .replace(/&hellip;/g, "...")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
-    // Normalise blank lines
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function stripTags(html: string): string {
-  return html.replace(/<[^>]+>/g, "");
-}
-
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
-}
-
-// ---------------------------------------------------------------------------
-// AI helper — used only for metadata (tiny response, never truncates)
+// AI helper
 // ---------------------------------------------------------------------------
 
 async function aiChat(
@@ -211,66 +127,6 @@ async function aiChat(
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("AI returned no content");
   return content;
-}
-
-export async function generateArticleFromUrl(url: string): Promise<GeneratedArticle> {
-  const cfg = resolveAiConfig();
-  if (!cfg) throw new Error("AI_API_KEY is required for URL import");
-
-  // 1. Fetch the page
-  const pageRes = await fetch(url, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (compatible; DevLearnBot/1.0)",
-      "accept": "text/html,application/xhtml+xml",
-    },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!pageRes.ok) throw new Error(`Failed to fetch URL: HTTP ${pageRes.status}`);
-  const html = await pageRes.text();
-
-  // 2. Extract main article body — greedy capture to include nested tags
-  const bodyMatch =
-    html.match(/<article[\s\S]*?>([\s\S]*)<\/article>/i) ||
-    html.match(/<main[\s\S]*?>([\s\S]*)<\/main>/i) ||
-    html.match(/<div[^>]+role=["']main["'][^>]*>([\s\S]*)<\/div>/i);
-
-  const bodyHtml = bodyMatch ? bodyMatch[1]! : html;
-
-  // 3. Convert HTML → Markdown directly in code (complete, no token limits)
-  const content = htmlToMarkdown(bodyHtml);
-
-  // 4. Use AI only for title / summary / tags (~50 token output — never fails)
-  const snippet = content.slice(0, 3000);
-  const raw = await aiChat(cfg, [
-    {
-      role: "system",
-      content: "Extract metadata from this article excerpt. Output ONLY valid JSON, no markdown fences.",
-    },
-    {
-      role: "user",
-      content:
-        `Return JSON: {"title":string,"summary":string,"tags":string}\n` +
-        `- title: concise article title\n` +
-        `- summary: 1-2 sentence plain-text summary\n` +
-        `- tags: 3-5 comma-separated lowercase tags\n` +
-        `\n=== ARTICLE EXCERPT ===\n${snippet}\n=== END ===`,
-    },
-  ], 256);
-
-  const meta = JSON.parse(raw) as { title?: string; summary?: string; tags?: string };
-
-  // Fallback: extract title from <title> or first heading if AI skipped it
-  const fallbackTitle =
-    html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ||
-    content.match(/^#+\s+(.+)/m)?.[1]?.trim() ||
-    "Imported Article";
-
-  return {
-    title: (meta.title ?? fallbackTitle).trim(),
-    content,
-    summary: (meta.summary ?? "").trim(),
-    tags: (meta.tags ?? "").trim(),
-  };
 }
 
 // ---------------------------------------------------------------------------
