@@ -117,12 +117,12 @@ export default function QuizView() {
                     strokeLinecap="round"
                     className="stroke-primary"
                     strokeDasharray={`${2 * Math.PI * 58}`}
-                    strokeDashoffset={`${2 * Math.PI * 58 * (1 - result.score / 100)}`}
+                    strokeDashoffset={`${2 * Math.PI * 58 * (1 - result.score)}`}
                     transform="rotate(-90 70 70)"
                     style={{ transition: "stroke-dashoffset 0.6s ease" }}
                   />
                 </svg>
-                <span className="absolute text-2xl md:text-3xl font-bold font-mono">{Math.round(result.score)}%</span>
+                <span className="absolute text-2xl md:text-3xl font-bold font-mono">{Math.round(result.score * 100)}%</span>
               </div>
               <Badge variant={result.passed ? "default" : "destructive"} className="text-lg px-4 py-1">
                 {result.passed ? "Passed" : "Needs Review"}
