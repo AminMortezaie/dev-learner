@@ -210,7 +210,7 @@ export default function QuizView() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowHint(!showHint)}
-                className={`shrink-0 font-mono text-xs gap-1.5 ${showHint ? "text-yellow-500 hover:text-yellow-400" : "text-muted-foreground hover:text-yellow-500"}`}
+                className={`shrink-0 font-mono text-xs gap-1.5 ${showHint ? "text-yellow-600 dark:text-yellow-500 hover:text-yellow-700 dark:hover:text-yellow-400" : "text-muted-foreground hover:text-yellow-600 dark:hover:text-yellow-500"}`}
               >
                 <Lightbulb className="h-3.5 w-3.5" />
                 {showHint ? "Hide hint" : "Hint"}
@@ -218,8 +218,8 @@ export default function QuizView() {
             )}
           </div>
           {showHint && currentQuestion.explanation && (
-            <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm text-yellow-200/90 animate-in fade-in duration-200">
-              <strong className="font-mono text-xs text-yellow-500/80 mb-1 block">HINT</strong>
+            <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm text-yellow-900 dark:text-yellow-200 animate-in fade-in duration-200">
+              <strong className="font-mono text-xs text-yellow-700 dark:text-yellow-500 mb-1 block">HINT</strong>
               {currentQuestion.explanation}
             </div>
           )}
