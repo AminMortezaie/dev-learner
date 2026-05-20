@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   useGetArticle,
@@ -10,9 +10,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CodeBlock } from "@/components/code-block";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, BrainCircuit, Calendar, Tag } from "lucide-react";
+import { ArrowLeft, BrainCircuit, Calendar, Tag, Volume2, Pause, Square } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+
+function stripMarkdownForSpeech(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " code block. ")
+    .replace(/`[^`]+`/g, (m) => m.slice(1, -1))
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1")
+    .replace(/>\s?/g, "")
+    .replace(/^\s*[-*]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/\n{2,}/g, ". ")
+    .replace(/\n/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 function renderInline(text: string): React.ReactNode {
   // Order matters: bold (**) before italic (*), then inline code
@@ -187,6 +202,42 @@ export default function ArticleView() {
     query: { queryKey: getGetArticleQuizQueryKey(articleId), enabled: false },
   });
 
+  const [ttsState, setTtsState] = useState<"idle" | "playing" | "paused">("idle");
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
+
+  const handleListen = () => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+
+    if (ttsState === "playing") {
+      synth.pause();
+      setTtsState("paused");
+      return;
+    }
+    if (ttsState === "paused") {
+      synth.resume();
+      setTtsState("playing");
+      return;
+    }
+
+    synth.cancel();
+    const text = `${article!.title}. ${stripMarkdownForSpeech(article!.content)}`;
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 0.95;
+    utt.onend = () => setTtsState("idle");
+    utt.onerror = () => setTtsState("idle");
+    utteranceRef.current = utt;
+    synth.speak(utt);
+    setTtsState("playing");
+  };
+
+  const handleStop = () => {
+    window.speechSynthesis?.cancel();
+    setTtsState("idle");
+  };
+
   const handleGenerateQuiz = async () => {
     try {
       const quiz = await getQuiz.refetch();
@@ -246,17 +297,41 @@ export default function ArticleView() {
         
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight leading-tight">{article.title}</h1>
         
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground font-mono mt-4">
-          <div className="flex items-center">
-            <Calendar className="mr-2 h-4 w-4" />
-            {new Date(article.createdAt!).toLocaleDateString()}
-          </div>
-          {article.tags && (
+        <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground font-mono">
             <div className="flex items-center">
-              <Tag className="mr-2 h-4 w-4" />
-              {article.tags.split(',').map(t => `#${t.trim()}`).join(' ')}
+              <Calendar className="mr-2 h-4 w-4" />
+              {new Date(article.createdAt!).toLocaleDateString()}
             </div>
-          )}
+            {article.tags && (
+              <div className="flex items-center">
+                <Tag className="mr-2 h-4 w-4" />
+                {article.tags.split(',').map(t => `#${t.trim()}`).join(' ')}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleListen}
+              className={`font-mono gap-1.5 ${ttsState === "playing" ? "border-primary text-primary" : ""}`}
+            >
+              {ttsState === "playing" ? (
+                <><Pause className="h-3.5 w-3.5" /> Pause</>
+              ) : ttsState === "paused" ? (
+                <><Volume2 className="h-3.5 w-3.5" /> Resume</>
+              ) : (
+                <><Volume2 className="h-3.5 w-3.5" /> Listen</>
+              )}
+            </Button>
+            {ttsState !== "idle" && (
+              <Button variant="ghost" size="sm" onClick={handleStop} className="font-mono gap-1.5 text-muted-foreground">
+                <Square className="h-3 w-3 fill-current" /> Stop
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
