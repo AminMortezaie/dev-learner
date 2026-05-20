@@ -13,15 +13,25 @@ if (import.meta.env.PROD && import.meta.env.VITE_API_URL) {
   setBaseUrl(import.meta.env.VITE_API_URL as string);
 }
 
-// When the service worker activates a new version, reload all open tabs so
-// users always see the latest build without needing a manual refresh.
+// Auto-update: works for both browser tabs and installed PWA.
+// On every app open, actively check for a new service worker version.
+// When a new SW activates (controllerchange), reload so the fresh build is shown.
 if ("serviceWorker" in navigator) {
   let reloading = false;
+
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (reloading) return;
     reloading = true;
     window.location.reload();
   });
+
+  // Force an update check each time the app gains focus (covers PWA reopens).
+  window.addEventListener("focus", () => {
+    navigator.serviceWorker.getRegistration().then((reg) => reg?.update());
+  });
+
+  // Also check immediately on page load.
+  navigator.serviceWorker.ready.then((reg) => reg.update());
 }
 
 // Pages placeholder
