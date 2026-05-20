@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   useGetArticle,
@@ -10,9 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CodeBlock } from "@/components/code-block";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, BrainCircuit, Calendar, Tag, Volume2, Pause, Square, Settings2 } from "lucide-react";
+import { ArrowLeft, BrainCircuit, Calendar, Tag, Volume2, Pause, Square } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,22 +29,16 @@ function stripMarkdownForSpeech(text: string): string {
     .trim();
 }
 
-// Score voices: prefer neural/natural/premium sounding ones
-function scoreVoice(v: SpeechSynthesisVoice): number {
-  const name = v.name.toLowerCase();
-  if (name.includes("neural") || name.includes("natural")) return 100;
-  if (name.includes("google")) return 90;
-  if (name.includes("microsoft") && (name.includes("online") || name.includes("aria") || name.includes("jenny") || name.includes("guy"))) return 85;
-  if (name.includes("microsoft")) return 70;
-  if (name.includes("samantha") || name.includes("karen") || name.includes("daniel")) return 75;
-  if (v.localService) return 30;
-  return 50;
-}
-
-function getBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   const eng = voices.filter(v => v.lang.startsWith("en"));
-  if (!eng.length) return voices[0] ?? null;
-  return eng.sort((a, b) => scoreVoice(b) - scoreVoice(a))[0] ?? null;
+  const pool = eng.length ? eng : voices;
+  return (
+    pool.find(v => v.name === "Daniel") ??
+    pool.find(v => v.name.toLowerCase().includes("daniel")) ??
+    pool.find(v => v.name === "Samantha") ??
+    pool.find(v => v.name.toLowerCase().includes("google")) ??
+    pool[0] ?? null
+  );
 }
 
 function renderInline(text: string): React.ReactNode {
@@ -223,45 +215,22 @@ export default function ArticleView() {
   });
 
   const [ttsState, setTtsState] = useState<"idle" | "playing" | "paused">("idle");
-  const [showTtsSettings, setShowTtsSettings] = useState(false);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoiceName, setSelectedVoiceName] = useState<string>("");
-  const [rate, setRate] = useState(1.0);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  const loadVoices = useCallback(() => {
-    const vs = window.speechSynthesis?.getVoices() ?? [];
-    if (!vs.length) return;
-    const engVoices = vs.filter(v => v.lang.startsWith("en"));
-    setVoices(engVoices.length ? engVoices : vs);
-    if (!selectedVoiceName) {
-      const best = getBestVoice(vs);
-      if (best) setSelectedVoiceName(best.name);
-    }
-  }, [selectedVoiceName]);
-
-  useEffect(() => {
-    loadVoices();
-    window.speechSynthesis?.addEventListener("voiceschanged", loadVoices);
-    return () => {
-      window.speechSynthesis?.removeEventListener("voiceschanged", loadVoices);
-      window.speechSynthesis?.cancel();
-    };
-  }, [loadVoices]);
+  useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
 
   const handleListen = () => {
     const synth = window.speechSynthesis;
     if (!synth) return;
-
     if (ttsState === "playing") { synth.pause(); setTtsState("paused"); return; }
     if (ttsState === "paused") { synth.resume(); setTtsState("playing"); return; }
 
     synth.cancel();
     const text = `${article!.title}. ${stripMarkdownForSpeech(article!.content)}`;
     const utt = new SpeechSynthesisUtterance(text);
-    const voice = voices.find(v => v.name === selectedVoiceName) ?? getBestVoice(synth.getVoices());
+    const voice = pickVoice(synth.getVoices());
     if (voice) utt.voice = voice;
-    utt.rate = rate;
+    utt.rate = 1.0;
     utt.pitch = 1.0;
     utt.onend = () => setTtsState("idle");
     utt.onerror = () => setTtsState("idle");
@@ -348,66 +317,25 @@ export default function ArticleView() {
             )}
           </div>
 
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleListen}
-                className={`font-mono gap-1.5 ${ttsState === "playing" ? "border-primary text-primary" : ""}`}
-              >
-                {ttsState === "playing" ? (
-                  <><Pause className="h-3.5 w-3.5" /> Pause</>
-                ) : ttsState === "paused" ? (
-                  <><Volume2 className="h-3.5 w-3.5" /> Resume</>
-                ) : (
-                  <><Volume2 className="h-3.5 w-3.5" /> Listen</>
-                )}
-              </Button>
-              {ttsState !== "idle" && (
-                <Button variant="ghost" size="sm" onClick={handleStop} className="font-mono gap-1.5 text-muted-foreground">
-                  <Square className="h-3 w-3 fill-current" /> Stop
-                </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleListen}
+              className={`font-mono gap-1.5 ${ttsState === "playing" ? "border-primary text-primary" : ""}`}
+            >
+              {ttsState === "playing" ? (
+                <><Pause className="h-3.5 w-3.5" /> Pause</>
+              ) : ttsState === "paused" ? (
+                <><Volume2 className="h-3.5 w-3.5" /> Resume</>
+              ) : (
+                <><Volume2 className="h-3.5 w-3.5" /> Listen</>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-8 w-8 ${showTtsSettings ? "text-primary" : "text-muted-foreground"}`}
-                onClick={() => setShowTtsSettings(s => !s)}
-                title="Voice settings"
-              >
-                <Settings2 className="h-3.5 w-3.5" />
+            </Button>
+            {ttsState !== "idle" && (
+              <Button variant="ghost" size="sm" onClick={handleStop} className="font-mono gap-1.5 text-muted-foreground">
+                <Square className="h-3 w-3 fill-current" /> Stop
               </Button>
-            </div>
-
-            {showTtsSettings && (
-              <div className="p-3 rounded-lg border border-border bg-card/80 backdrop-blur shadow-md w-64 space-y-3 animate-in fade-in duration-150">
-                <div className="space-y-1">
-                  <label className="text-xs font-mono text-muted-foreground">Voice</label>
-                  <Select value={selectedVoiceName} onValueChange={setSelectedVoiceName}>
-                    <SelectTrigger className="h-8 text-xs font-mono">
-                      <SelectValue placeholder="Select voice" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {voices.map(v => (
-                        <SelectItem key={v.name} value={v.name} className="text-xs">
-                          {v.name.replace(/Microsoft |Google /, "")}
-                          {!v.localService && " ✨"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-mono text-muted-foreground">Speed: {rate.toFixed(1)}×</label>
-                  <Slider
-                    min={0.5} max={2} step={0.1}
-                    value={[rate]}
-                    onValueChange={([v]) => setRate(v!)}
-                    className="w-full"
-                  />
-                </div>
-              </div>
             )}
           </div>
         </div>
