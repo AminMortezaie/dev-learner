@@ -1,9 +1,27 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Terminal, LayoutDashboard, BookOpen, Layers, Library, BrainCircuit, Code2, Menu } from "lucide-react";
+import { LayoutDashboard, BookOpen, Layers, Library, BrainCircuit, Menu } from "lucide-react";
 import { useTheme } from "./theme-provider";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+
+function LogoMark({ size = 28 }: { size?: number }) {
+  const s = size / 28;
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="lbg" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#FF5C1A"/>
+          <stop offset="100%" stopColor="#CC2800"/>
+        </linearGradient>
+      </defs>
+      <rect width="28" height="28" rx="6" fill="url(#lbg)"/>
+      <rect x="0.5" y="0.5" width="27" height="13" rx="5.5" fill="white" fillOpacity="0.08"/>
+      <path d="M5 8.5 L12.5 14 L5 19.5" stroke="white" strokeWidth={2.2 * s} strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <line x1="14.5" y1="19" x2="22.5" y2="19" stroke="white" strokeWidth={2.2 * s} strokeLinecap="round"/>
+    </svg>
+  );
+}
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -55,8 +73,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col shrink-0">
-        <div className="h-14 flex items-center px-4 border-b border-border">
-          <Terminal className="h-6 w-6 mr-2 text-primary" />
+        <div className="h-14 flex items-center px-4 border-b border-border gap-2.5">
+          <LogoMark size={30} />
           <span className="font-bold text-lg font-mono">DevLearn_</span>
         </div>
         <NavLinks location={location} />
@@ -68,8 +86,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile top bar */}
       <div className="flex flex-col flex-1 min-w-0">
         <header className="md:hidden h-14 flex items-center justify-between px-4 border-b border-border bg-card shrink-0">
-          <div className="flex items-center">
-            <Terminal className="h-5 w-5 mr-2 text-primary" />
+          <div className="flex items-center gap-2">
+            <LogoMark size={26} />
             <span className="font-bold text-base font-mono">DevLearn_</span>
           </div>
           <div className="flex items-center gap-2">
