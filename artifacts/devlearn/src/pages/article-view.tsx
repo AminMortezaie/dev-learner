@@ -247,9 +247,17 @@ export default function ArticleView() {
       const segIdx = idx - 1; // -1 = title (no highlight), 0+ = content segments
       setActiveSegIdx(segIdx);
       if (segIdx >= 0) {
-        segRefs.current[segIdx]?.scrollIntoView({ behavior: "smooth", block: "center" });
+        const el = segRefs.current[segIdx];
+        if (el) {
+          const { top, bottom } = el.getBoundingClientRect();
+          const vh = window.innerHeight;
+          // Only scroll if the paragraph isn't already in a comfortable reading zone
+          if (top < 80 || bottom > vh - 80) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }
       } else {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
       }
 
       const utt = new SpeechSynthesisUtterance(allParts[idx]!);
@@ -393,8 +401,8 @@ export default function ArticleView() {
           <div
             key={i}
             ref={el => { segRefs.current[i] = el; }}
-            className={`transition-colors duration-300 rounded-md ${
-              activeSegIdx === i ? "bg-yellow-400/20 dark:bg-yellow-400/15 -mx-2 px-2 ring-1 ring-yellow-400/40" : ""
+            className={`transition-colors duration-300 rounded-md -mx-2 px-2 scroll-mt-20 ${
+              activeSegIdx === i ? "bg-yellow-400/20 dark:bg-yellow-400/15 ring-1 ring-yellow-400/40" : ""
             }`}
           >
             {renderMarkdown(seg)}
