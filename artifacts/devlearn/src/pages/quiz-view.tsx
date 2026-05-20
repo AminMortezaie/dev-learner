@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, XCircle, BrainCircuit } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, BrainCircuit, Lightbulb } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 export default function QuizView() {
@@ -26,6 +26,7 @@ export default function QuizView() {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [showHint, setShowHint] = useState(false);
 
   if (isLoading) {
     return (
@@ -60,6 +61,7 @@ export default function QuizView() {
   };
 
   const handleNext = () => {
+    setShowHint(false);
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
@@ -68,6 +70,7 @@ export default function QuizView() {
   };
 
   const handlePrevious = () => {
+    setShowHint(false);
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
@@ -200,7 +203,26 @@ export default function QuizView() {
 
       <Card className="bg-card/50 backdrop-blur">
         <CardHeader>
-          <CardTitle className="text-xl leading-relaxed">{currentQuestion.question}</CardTitle>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-xl leading-relaxed">{currentQuestion.question}</CardTitle>
+            {currentQuestion.explanation && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHint(!showHint)}
+                className={`shrink-0 font-mono text-xs gap-1.5 ${showHint ? "text-yellow-500 hover:text-yellow-400" : "text-muted-foreground hover:text-yellow-500"}`}
+              >
+                <Lightbulb className="h-3.5 w-3.5" />
+                {showHint ? "Hide hint" : "Hint"}
+              </Button>
+            )}
+          </div>
+          {showHint && currentQuestion.explanation && (
+            <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm text-yellow-200/90 animate-in fade-in duration-200">
+              <strong className="font-mono text-xs text-yellow-500/80 mb-1 block">HINT</strong>
+              {currentQuestion.explanation}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-3">
           {currentQuestion.options.map((opt, idx) => (
