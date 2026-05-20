@@ -281,6 +281,19 @@ export default function ArticleView() {
 
   return (
     <div className="max-w-3xl mx-auto animate-in fade-in duration-500 pb-20">
+      {ttsState !== "idle" && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full border border-border bg-card/90 backdrop-blur shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <Volume2 className={`h-4 w-4 ${ttsState === "playing" ? "text-primary animate-pulse" : "text-muted-foreground"}`} />
+          <span className="text-xs font-mono text-muted-foreground">{ttsState === "playing" ? "Reading..." : "Paused"}</span>
+          <div className="w-px h-4 bg-border mx-1" />
+          <button onClick={handleListen} className="text-xs font-mono font-medium hover:text-primary transition-colors">
+            {ttsState === "playing" ? "Pause" : "Resume"}
+          </button>
+          <button onClick={handleStop} className="text-xs font-mono text-muted-foreground hover:text-destructive transition-colors">
+            Stop
+          </button>
+        </div>
+      )}
       <Link href="/articles">
         <Button variant="ghost" className="mb-6 -ml-4 font-mono text-muted-foreground hover:text-foreground">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Library
