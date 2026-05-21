@@ -1,0 +1,530 @@
+[
+  {
+    "languageSlug": "java",
+    "slug": "console-banking",
+    "title": "Console Banking Account",
+    "description": "Model a bank account with deposit, withdraw, and balance checks in plain Java.",
+    "difficulty": "beginner",
+    "codeLanguage": "java",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Account class",
+        "goal": "Account type compiles.",
+        "instructions": "Create an `Account` class with owner name and balance fields.",
+        "snippets": [
+          {
+            "path": "Account.java",
+            "action": "create",
+            "label": "Account.java",
+            "code": "public class Account {\n    private final String owner;\n    private double balance;\n\n    public Account(String owner, double initial) {\n        this.owner = owner;\n        this.balance = initial;\n    }\n\n    public double getBalance() {\n        return balance;\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Deposit and withdraw",
+        "goal": "Mutations update balance.",
+        "instructions": "Add `deposit` and `withdraw` that reject negative amounts and insufficient funds.",
+        "snippets": [
+          {
+            "path": "Account.java",
+            "action": "modify",
+            "label": "Account.java",
+            "code": "public class Account {\n    private final String owner;\n    private double balance;\n\n    public Account(String owner, double initial) {\n        this.owner = owner;\n        this.balance = initial;\n    }\n\n    public void deposit(double amount) {\n        if (amount <= 0) throw new IllegalArgumentException(\"amount\");\n        balance += amount;\n    }\n\n    public void withdraw(double amount) {\n        if (amount <= 0) throw new IllegalArgumentException(\"amount\");\n        if (amount > balance) throw new IllegalStateException(\"insufficient\");\n        balance -= amount;\n    }\n\n    public double getBalance() { return balance; }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Main demo",
+        "goal": "CLI prints transactions.",
+        "instructions": "Wire a `Main` class that opens an account and prints balance after operations.",
+        "snippets": [
+          {
+            "path": "Main.java",
+            "action": "create",
+            "label": "Main.java",
+            "code": "public class Main {\n    public static void main(String[] args) {\n        Account acc = new Account(\"Ada\", 100.0);\n        acc.deposit(50.0);\n        acc.withdraw(30.0);\n        System.out.println(\"balance=\" + acc.getBalance());\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Transfer helper",
+        "goal": "Move funds between accounts.",
+        "instructions": "Add a static `transfer` that withdraws from one account and deposits to another.",
+        "snippets": [
+          {
+            "path": "Account.java",
+            "action": "modify",
+            "label": "Account.java",
+            "code": "public class Account {\n    private final String owner;\n    private double balance;\n\n    public Account(String owner, double initial) {\n        this.owner = owner;\n        this.balance = initial;\n    }\n\n    public void deposit(double amount) {\n        if (amount <= 0) throw new IllegalArgumentException(\"amount\");\n        balance += amount;\n    }\n\n    public void withdraw(double amount) {\n        if (amount <= 0) throw new IllegalArgumentException(\"amount\");\n        if (amount > balance) throw new IllegalStateException(\"insufficient\");\n        balance -= amount;\n    }\n\n    public static void transfer(Account from, Account to, double amount) {\n        from.withdraw(amount);\n        to.deposit(amount);\n    }\n\n    public double getBalance() { return balance; }\n    public String getOwner() { return owner; }\n}\n"
+          },
+          {
+            "path": "Main.java",
+            "action": "modify",
+            "label": "Main.java",
+            "code": "public class Main {\n    public static void main(String[] args) {\n        Account a = new Account(\"Ada\", 100.0);\n        Account b = new Account(\"Bob\", 20.0);\n        Account.transfer(a, b, 25.0);\n        System.out.println(a.getOwner() + \"=\" + a.getBalance());\n        System.out.println(b.getOwner() + \"=\" + b.getBalance());\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "java",
+    "slug": "stream-etl",
+    "title": "Stream CSV ETL",
+    "description": "Parse CSV lines and uppercase names using Java Streams.",
+    "difficulty": "intermediate",
+    "codeLanguage": "java",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Record model",
+        "goal": "CsvRow exists.",
+        "instructions": "Define a simple `CsvRow` record with id and name.",
+        "snippets": [
+          {
+            "path": "CsvRow.java",
+            "action": "create",
+            "label": "CsvRow.java",
+            "code": "public record CsvRow(int id, String name) {\n    public static CsvRow parse(String line) {\n        String[] parts = line.split(\",\");\n        return new CsvRow(Integer.parseInt(parts[0].trim()), parts[1].trim());\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Parse lines",
+        "goal": "List of rows.",
+        "instructions": "Read sample lines into a `List<CsvRow>`.",
+        "snippets": [
+          {
+            "path": "Etl.java",
+            "action": "create",
+            "label": "Etl.java",
+            "code": "import java.util.List;\n\npublic class Etl {\n    public static void main(String[] args) {\n        List<String> lines = List.of(\"1,ada\", \"2,bob\", \"3,cara\");\n        List<CsvRow> rows = lines.stream().map(CsvRow::parse).toList();\n        System.out.println(rows.size());\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Uppercase transform",
+        "goal": "Stream map.",
+        "instructions": "Map names to uppercase with `.map`.",
+        "snippets": [
+          {
+            "path": "Etl.java",
+            "action": "modify",
+            "label": "Etl.java",
+            "code": "import java.util.List;\n\npublic class Etl {\n    public static void main(String[] args) {\n        List<String> lines = List.of(\"1,ada\", \"2,bob\");\n        List<String> out = lines.stream()\n            .map(CsvRow::parse)\n            .map(r -> r.id() + \",\" + r.name().toUpperCase())\n            .toList();\n        out.forEach(System.out::println);\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Filter and collect",
+        "goal": "ETL pipeline.",
+        "instructions": "Skip empty names, collect to a new list, print joined output.",
+        "snippets": [
+          {
+            "path": "Etl.java",
+            "action": "modify",
+            "label": "Etl.java",
+            "code": "import java.util.List;\nimport java.util.stream.Collectors;\n\npublic class Etl {\n    public static void main(String[] args) {\n        List<String> lines = List.of(\"1,ada\", \"2,\", \"3,cara\");\n        String result = lines.stream()\n            .map(CsvRow::parse)\n            .filter(r -> !r.name().isBlank())\n            .map(r -> r.id() + \",\" + r.name().toUpperCase())\n            .collect(Collectors.joining(\"\\n\"));\n        System.out.println(result);\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "java",
+    "slug": "thread-safe-cache",
+    "title": "Thread-Safe Cache",
+    "description": "Build a cache with `ConcurrentHashMap` and atomic compute operations.",
+    "difficulty": "intermediate",
+    "codeLanguage": "java",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Cache skeleton",
+        "goal": "Generic cache type.",
+        "instructions": "Wrap `ConcurrentHashMap` in a `Cache<K,V>` class.",
+        "snippets": [
+          {
+            "path": "Cache.java",
+            "action": "create",
+            "label": "Cache.java",
+            "code": "import java.util.concurrent.ConcurrentHashMap;\n\npublic class Cache<K, V> {\n    private final ConcurrentHashMap<K, V> map = new ConcurrentHashMap<>();\n\n    public V get(K key) {\n        return map.get(key);\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Put and get",
+        "goal": "Basic CRUD.",
+        "instructions": "Add `put` and `getOrDefault` methods.",
+        "snippets": [
+          {
+            "path": "Cache.java",
+            "action": "modify",
+            "label": "Cache.java",
+            "code": "import java.util.concurrent.ConcurrentHashMap;\n\npublic class Cache<K, V> {\n    private final ConcurrentHashMap<K, V> map = new ConcurrentHashMap<>();\n\n    public void put(K key, V value) {\n        map.put(key, value);\n    }\n\n    public V getOrDefault(K key, V fallback) {\n        return map.getOrDefault(key, fallback);\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Compute if absent",
+        "goal": "Loader pattern.",
+        "instructions": "Use `computeIfAbsent` to load values once per key.",
+        "snippets": [
+          {
+            "path": "Cache.java",
+            "action": "modify",
+            "label": "Cache.java",
+            "code": "import java.util.concurrent.ConcurrentHashMap;\nimport java.util.function.Function;\n\npublic class Cache<K, V> {\n    private final ConcurrentHashMap<K, V> map = new ConcurrentHashMap<>();\n\n    public V getOrLoad(K key, Function<K, V> loader) {\n        return map.computeIfAbsent(key, loader);\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Demo main",
+        "goal": "Concurrent readers.",
+        "instructions": "Simulate parallel access from `Main`.",
+        "snippets": [
+          {
+            "path": "Main.java",
+            "action": "create",
+            "label": "Main.java",
+            "code": "public class Main {\n    public static void main(String[] args) {\n        Cache<String, String> cache = new Cache<>();\n        String v1 = cache.getOrLoad(\"user:1\", k -> \"loaded-\" + k);\n        String v2 = cache.getOrLoad(\"user:1\", k -> \"should-not-run\");\n        System.out.println(v1);\n        System.out.println(v2);\n    }\n}\n"
+          },
+          {
+            "path": "Cache.java",
+            "action": "modify",
+            "label": "Cache.java",
+            "code": "import java.util.concurrent.ConcurrentHashMap;\nimport java.util.function.Function;\n\npublic class Cache<K, V> {\n    private final ConcurrentHashMap<K, V> map = new ConcurrentHashMap<>();\n\n    public V getOrLoad(K key, Function<K, V> loader) {\n        return map.computeIfAbsent(key, loader);\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "java",
+    "slug": "completable-future-aggregator",
+    "title": "CompletableFuture Aggregator",
+    "description": "Combine two async supplies with `CompletableFuture`.",
+    "difficulty": "advanced",
+    "codeLanguage": "java",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Async supplies",
+        "goal": "Two delayed tasks.",
+        "instructions": "Create suppliers that sleep and return strings.",
+        "snippets": [
+          {
+            "path": "Aggregator.java",
+            "action": "create",
+            "label": "Aggregator.java",
+            "code": "import java.util.concurrent.CompletableFuture;\n\npublic class Aggregator {\n    static CompletableFuture<String> fetchA() {\n        return CompletableFuture.supplyAsync(() -> {\n            sleep(200);\n            return \"A\";\n        });\n    }\n\n    static void sleep(long ms) {\n        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Second supply",
+        "goal": "Parallel fetch B.",
+        "instructions": "Add `fetchB` with a different delay.",
+        "snippets": [
+          {
+            "path": "Aggregator.java",
+            "action": "modify",
+            "label": "Aggregator.java",
+            "code": "import java.util.concurrent.CompletableFuture;\n\npublic class Aggregator {\n    static CompletableFuture<String> fetchA() {\n        return CompletableFuture.supplyAsync(() -> { sleep(200); return \"A\"; });\n    }\n\n    static CompletableFuture<String> fetchB() {\n        return CompletableFuture.supplyAsync(() -> { sleep(300); return \"B\"; });\n    }\n\n    static void sleep(long ms) {\n        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Combine results",
+        "goal": "allOf and join.",
+        "instructions": "Wait for both futures and merge strings.",
+        "snippets": [
+          {
+            "path": "Aggregator.java",
+            "action": "modify",
+            "label": "Aggregator.java",
+            "code": "import java.util.concurrent.CompletableFuture;\n\npublic class Aggregator {\n    public static String aggregate() {\n        CompletableFuture<String> a = fetchA();\n        CompletableFuture<String> b = fetchB();\n        return a.thenCombine(b, (x, y) -> x + \"+\" + y).join();\n    }\n\n    static CompletableFuture<String> fetchA() {\n        return CompletableFuture.supplyAsync(() -> { sleep(200); return \"A\"; });\n    }\n\n    static CompletableFuture<String> fetchB() {\n        return CompletableFuture.supplyAsync(() -> { sleep(300); return \"B\"; });\n    }\n\n    static void sleep(long ms) {\n        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Error handling",
+        "goal": " exceptionally.",
+        "instructions": "Map failures to a fallback value with `exceptionally`.",
+        "snippets": [
+          {
+            "path": "Aggregator.java",
+            "action": "modify",
+            "label": "Aggregator.java",
+            "code": "import java.util.concurrent.CompletableFuture;\n\npublic class Aggregator {\n    public static String aggregateSafe() {\n        return fetchA()\n            .thenCombine(fetchB(), (x, y) -> x + \"+\" + y)\n            .exceptionally(ex -> \"fallback\")\n            .join();\n    }\n\n    static CompletableFuture<String> fetchA() {\n        return CompletableFuture.supplyAsync(() -> { sleep(200); return \"A\"; });\n    }\n\n    static CompletableFuture<String> fetchB() {\n        return CompletableFuture.supplyAsync(() -> { sleep(300); return \"B\"; });\n    }\n\n    static void sleep(long ms) {\n        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }\n    }\n\n    public static void main(String[] args) {\n        System.out.println(aggregateSafe());\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "java",
+    "slug": "virtual-thread-crawler",
+    "title": "Virtual Thread URL Crawler",
+    "description": "Fetch URLs concurrently with an executor or virtual threads.",
+    "difficulty": "advanced",
+    "codeLanguage": "java",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Fetch helper",
+        "goal": "HTTP status.",
+        "instructions": "Use `HttpClient` to GET a URL and return status code.",
+        "snippets": [
+          {
+            "path": "Fetcher.java",
+            "action": "create",
+            "label": "Fetcher.java",
+            "code": "import java.net.URI;\nimport java.net.http.HttpClient;\nimport java.net.http.HttpRequest;\nimport java.net.http.HttpResponse;\n\npublic class Fetcher {\n    private final HttpClient client = HttpClient.newHttpClient();\n\n    public int fetchStatus(String url) throws Exception {\n        HttpRequest req = HttpRequest.newBuilder(URI.create(url)).GET().build();\n        HttpResponse<Void> res = client.send(req, HttpResponse.BodyHandlers.discarding());\n        return res.statusCode();\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Executor tasks",
+        "goal": "Submit per URL.",
+        "instructions": "Use `ExecutorService` to submit callables for each URL.",
+        "snippets": [
+          {
+            "path": "Crawler.java",
+            "action": "create",
+            "label": "Crawler.java",
+            "code": "import java.util.List;\nimport java.util.concurrent.ExecutorService;\nimport java.util.concurrent.Executors;\nimport java.util.concurrent.Future;\n\npublic class Crawler {\n    public static void main(String[] args) throws Exception {\n        Fetcher fetcher = new Fetcher();\n        List<String> urls = List.of(\"https://httpbin.org/get\", \"https://httpbin.org/delay/1\");\n        try (ExecutorService pool = Executors.newFixedThreadPool(4)) {\n            for (String url : urls) {\n                Future<Integer> f = pool.submit(() -> fetcher.fetchStatus(url));\n                System.out.println(url + \" -> \" + f.get());\n            }\n        }\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Virtual threads",
+        "goal": "Per-URL thread.",
+        "instructions": "Replace fixed pool with `Executors.newVirtualThreadPerTaskExecutor()`.",
+        "snippets": [
+          {
+            "path": "Crawler.java",
+            "action": "modify",
+            "label": "Crawler.java",
+            "code": "import java.util.List;\nimport java.util.concurrent.ExecutorService;\nimport java.util.concurrent.Executors;\nimport java.util.concurrent.Future;\n\npublic class Crawler {\n    public static void main(String[] args) throws Exception {\n        Fetcher fetcher = new Fetcher();\n        List<String> urls = List.of(\"https://httpbin.org/get\", \"https://httpbin.org/delay/1\");\n        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {\n            List<Future<Integer>> futures = urls.stream()\n                .map(url -> pool.submit(() -> fetcher.fetchStatus(url)))\n                .toList();\n            for (int i = 0; i < urls.size(); i++) {\n                System.out.println(urls.get(i) + \" -> \" + futures.get(i).get());\n            }\n        }\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Timeout handling",
+        "goal": "Bounded wait.",
+        "instructions": "Wrap `get` with a timeout using `orTimeout` on CompletableFuture.",
+        "snippets": [
+          {
+            "path": "Crawler.java",
+            "action": "modify",
+            "label": "Crawler.java",
+            "code": "import java.util.List;\nimport java.util.concurrent.*;\n\npublic class Crawler {\n    public static void main(String[] args) {\n        Fetcher fetcher = new Fetcher();\n        List<String> urls = List.of(\"https://httpbin.org/get\", \"https://httpbin.org/delay/2\");\n        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {\n            for (String url : urls) {\n                CompletableFuture<Integer> cf = CompletableFuture.supplyAsync(() -> {\n                    try { return fetcher.fetchStatus(url); } catch (Exception e) { throw new CompletionException(e); }\n                }, pool);\n                try {\n                    System.out.println(url + \" -> \" + cf.orTimeout(3, TimeUnit.SECONDS).join());\n                } catch (CompletionException ex) {\n                    System.out.println(url + \" -> timeout/error\");\n                }\n            }\n        }\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "java",
+    "slug": "mini-http-rest",
+    "title": "Mini HTTP REST Server",
+    "description": "Expose JSON over `com.sun.net.httpserver.HttpServer`.",
+    "difficulty": "intermediate",
+    "codeLanguage": "java",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "HttpServer boot",
+        "goal": "Server listens.",
+        "instructions": "Create an `HttpServer` on port 8080 with a root handler.",
+        "snippets": [
+          {
+            "path": "App.java",
+            "action": "create",
+            "label": "App.java",
+            "code": "import com.sun.net.httpserver.HttpServer;\nimport java.io.IOException;\nimport java.net.InetSocketAddress;\n\npublic class App {\n    public static void main(String[] args) throws IOException {\n        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);\n        server.createContext(\"/\", exchange -> {\n            byte[] body = \"ok\".getBytes();\n            exchange.sendResponseHeaders(200, body.length);\n            exchange.getResponseBody().write(body);\n            exchange.close();\n        });\n        server.start();\n        System.out.println(\"listening\");\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "JSON item model",
+        "goal": "Record for items.",
+        "instructions": "Add an `Item` record and in-memory list.",
+        "snippets": [
+          {
+            "path": "Item.java",
+            "action": "create",
+            "label": "Item.java",
+            "code": "public record Item(int id, String name) {}\n"
+          },
+          {
+            "path": "Store.java",
+            "action": "create",
+            "label": "Store.java",
+            "code": "import java.util.ArrayList;\nimport java.util.List;\n\npublic class Store {\n    private final List<Item> items = new ArrayList<>();\n    private int nextId = 1;\n\n    public Item create(String name) {\n        Item item = new Item(nextId++, name);\n        items.add(item);\n        return item;\n    }\n\n    public List<Item> list() { return List.copyOf(items); }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "GET /items",
+        "goal": "List JSON.",
+        "instructions": "Register `/items` handler returning JSON array.",
+        "snippets": [
+          {
+            "path": "App.java",
+            "action": "modify",
+            "label": "App.java",
+            "code": "import com.sun.net.httpserver.HttpServer;\nimport java.io.IOException;\nimport java.net.InetSocketAddress;\nimport java.nio.charset.StandardCharsets;\n\npublic class App {\n    private static final Store store = new Store();\n\n    public static void main(String[] args) throws IOException {\n        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);\n        server.createContext(\"/items\", exchange -> {\n            if (!\"GET\".equals(exchange.getRequestMethod())) {\n                exchange.sendResponseHeaders(405, -1);\n                return;\n            }\n            String json = store.list().toString();\n            byte[] body = json.getBytes(StandardCharsets.UTF_8);\n            exchange.getResponseHeaders().add(\"Content-Type\", \"application/json\");\n            exchange.sendResponseHeaders(200, body.length);\n            exchange.getResponseBody().write(body);\n            exchange.close();\n        });\n        server.start();\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "POST /items",
+        "goal": "Create item.",
+        "instructions": "Parse JSON body on POST and return 201.",
+        "snippets": [
+          {
+            "path": "App.java",
+            "action": "modify",
+            "label": "App.java",
+            "code": "import com.sun.net.httpserver.HttpServer;\nimport java.io.IOException;\nimport java.io.InputStream;\nimport java.net.InetSocketAddress;\nimport java.nio.charset.StandardCharsets;\n\npublic class App {\n    private static final Store store = new Store();\n\n    public static void main(String[] args) throws IOException {\n        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);\n        server.createContext(\"/items\", exchange -> {\n            switch (exchange.getRequestMethod()) {\n                case \"GET\" -> writeJson(exchange, 200, store.list().toString());\n                case \"POST\" -> {\n                    String body = new String(readAll(exchange.getRequestBody()), StandardCharsets.UTF_8);\n                    String name = body.replaceAll(\".*\\\"name\\\"\\\\s*:\\\\s*\\\"([^\\\"]+)\\\".*\", \"$1\");\n                    Item created = store.create(name);\n                    writeJson(exchange, 201, created.toString());\n                }\n                default -> exchange.sendResponseHeaders(405, -1);\n            }\n        });\n        server.start();\n    }\n\n    static byte[] readAll(InputStream in) throws IOException { return in.readAllBytes(); }\n\n    static void writeJson(com.sun.net.httpserver.HttpExchange ex, int code, String json) throws IOException {\n        byte[] body = json.getBytes(StandardCharsets.UTF_8);\n        ex.getResponseHeaders().add(\"Content-Type\", \"application/json\");\n        ex.sendResponseHeaders(code, body.length);\n        ex.getResponseBody().write(body);\n        ex.close();\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "java",
+    "slug": "sealed-expression-eval",
+    "title": "Sealed Expression Evaluator",
+    "description": "Model expressions with sealed types and evaluate to integers.",
+    "difficulty": "intermediate",
+    "codeLanguage": "java",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Sealed Expr",
+        "goal": "Hierarchy defined.",
+        "instructions": "Declare sealed `Expr` with `Num` and `Add` permits.",
+        "snippets": [
+          {
+            "path": "Expr.java",
+            "action": "create",
+            "label": "Expr.java",
+            "code": "public sealed interface Expr permits Num, Add {}\n\nrecord Num(int value) implements Expr {}\n\nrecord Add(Expr left, Expr right) implements Expr {}\n"
+          }
+        ]
+      },
+      {
+        "title": "Evaluator",
+        "goal": "Recursive eval.",
+        "instructions": "Implement `eval(Expr)` with pattern matching.",
+        "snippets": [
+          {
+            "path": "Evaluator.java",
+            "action": "create",
+            "label": "Evaluator.java",
+            "code": "public class Evaluator {\n    public static int eval(Expr expr) {\n        return switch (expr) {\n            case Num(int v) -> v;\n            case Add(var l, var r) -> eval(l) + eval(r);\n        };\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Build tree",
+        "goal": "Sample AST.",
+        "instructions": "Construct `Add(Num(1), Num(2))` in main.",
+        "snippets": [
+          {
+            "path": "Main.java",
+            "action": "create",
+            "label": "Main.java",
+            "code": "public class Main {\n    public static void main(String[] args) {\n        Expr tree = new Add(new Num(1), new Num(2));\n        System.out.println(Evaluator.eval(tree));\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Nested add",
+        "goal": "Deeper tree.",
+        "instructions": "Evaluate `(1 + 2) + 3` and print result.",
+        "snippets": [
+          {
+            "path": "Main.java",
+            "action": "modify",
+            "label": "Main.java",
+            "code": "public class Main {\n    public static void main(String[] args) {\n        Expr tree = new Add(new Add(new Num(1), new Num(2)), new Num(3));\n        System.out.println(Evaluator.eval(tree));\n    }\n}\n"
+          },
+          {
+            "path": "Evaluator.java",
+            "action": "modify",
+            "label": "Evaluator.java",
+            "code": "public class Evaluator {\n    public static int eval(Expr expr) {\n        return switch (expr) {\n            case Num(int v) -> v;\n            case Add(var l, var r) -> eval(l) + eval(r);\n        };\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "java",
+    "slug": "producer-consumer-queue",
+    "title": "Producer Consumer Queue",
+    "description": "Coordinate producers and consumers with `BlockingQueue`.",
+    "difficulty": "intermediate",
+    "codeLanguage": "java",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Queue setup",
+        "goal": "BlockingQueue created.",
+        "instructions": "Allocate an `ArrayBlockingQueue` with capacity 10.",
+        "snippets": [
+          {
+            "path": "Pipeline.java",
+            "action": "create",
+            "label": "Pipeline.java",
+            "code": "import java.util.concurrent.ArrayBlockingQueue;\nimport java.util.concurrent.BlockingQueue;\n\npublic class Pipeline {\n    public static void main(String[] args) {\n        BlockingQueue<String> queue = new ArrayBlockingQueue<>(10);\n        System.out.println(queue.remainingCapacity());\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Producer",
+        "goal": "Put items.",
+        "instructions": "Run a producer thread that `put`s work items.",
+        "snippets": [
+          {
+            "path": "Pipeline.java",
+            "action": "modify",
+            "label": "Pipeline.java",
+            "code": "import java.util.concurrent.ArrayBlockingQueue;\nimport java.util.concurrent.BlockingQueue;\n\npublic class Pipeline {\n    static void producer(BlockingQueue<String> q) throws InterruptedException {\n        for (int i = 1; i <= 5; i++) {\n            q.put(\"job-\" + i);\n            System.out.println(\"produced job-\" + i);\n        }\n    }\n\n    public static void main(String[] args) throws Exception {\n        BlockingQueue<String> queue = new ArrayBlockingQueue<>(10);\n        Thread t = new Thread(() -> { try { producer(queue); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });\n        t.start();\n        t.join();\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Consumer",
+        "goal": "Take items.",
+        "instructions": "Add a consumer loop with `take`.",
+        "snippets": [
+          {
+            "path": "Pipeline.java",
+            "action": "modify",
+            "label": "Pipeline.java",
+            "code": "import java.util.concurrent.ArrayBlockingQueue;\nimport java.util.concurrent.BlockingQueue;\n\npublic class Pipeline {\n    static void producer(BlockingQueue<String> q) throws InterruptedException {\n        for (int i = 1; i <= 5; i++) q.put(\"job-\" + i);\n    }\n\n    static void consumer(BlockingQueue<String> q) throws InterruptedException {\n        for (int i = 0; i < 5; i++) {\n            String item = q.take();\n            System.out.println(\"consumed \" + item);\n        }\n    }\n\n    public static void main(String[] args) throws Exception {\n        BlockingQueue<String> queue = new ArrayBlockingQueue<>(10);\n        Thread p = new Thread(() -> run(producer(queue)));\n        Thread c = new Thread(() -> run(consumer(queue)));\n        p.start(); c.start();\n        p.join(); c.join();\n    }\n\n    static void run(ThrowableRunnable r) { try { r.run(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }\n    @FunctionalInterface interface ThrowableRunnable { void run() throws InterruptedException; }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Poison pill",
+        "goal": "Graceful stop.",
+        "instructions": "Send a sentinel value to stop the consumer.",
+        "snippets": [
+          {
+            "path": "Pipeline.java",
+            "action": "modify",
+            "label": "Pipeline.java",
+            "code": "import java.util.concurrent.ArrayBlockingQueue;\nimport java.util.concurrent.BlockingQueue;\n\npublic class Pipeline {\n    static final String POISON = \"__STOP__\";\n\n    static void producer(BlockingQueue<String> q) throws InterruptedException {\n        for (int i = 1; i <= 3; i++) q.put(\"job-\" + i);\n        q.put(POISON);\n    }\n\n    static void consumer(BlockingQueue<String> q) throws InterruptedException {\n        while (true) {\n            String item = q.take();\n            if (POISON.equals(item)) break;\n            System.out.println(\"consumed \" + item);\n        }\n    }\n\n    public static void main(String[] args) throws Exception {\n        BlockingQueue<String> queue = new ArrayBlockingQueue<>(10);\n        Thread p = new Thread(() -> run(() -> producer(queue)));\n        Thread c = new Thread(() -> run(() -> consumer(queue)));\n        p.start(); c.start();\n        p.join(); c.join();\n    }\n\n    static void run(ThrowableRunnable r) { try { r.run(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }\n    @FunctionalInterface interface ThrowableRunnable { void run() throws InterruptedException; }\n}\n"
+          }
+        ]
+      }
+    ]
+  }
+]

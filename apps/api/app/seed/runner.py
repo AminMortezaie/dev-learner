@@ -34,7 +34,16 @@ def _seed_projects(db: Session, lang_by_slug: dict[str, Language]) -> None:
     db.execute(delete(Project))
     db.flush()
 
-    projects_data = _load("projects.json")
+    projects_dir = DATA_DIR / "projects"
+    projects_data: list = []
+    if projects_dir.is_dir():
+        for path in sorted(projects_dir.glob("*.json")):
+            chunk = json.loads(path.read_text(encoding="utf-8"))
+            projects_data.extend(chunk if isinstance(chunk, list) else [chunk])
+    else:
+        legacy = DATA_DIR / "projects.json"
+        if legacy.exists():
+            projects_data = json.loads(legacy.read_text(encoding="utf-8"))
     print(f"[seed] inserting {len(projects_data)} projects")
     for row in projects_data:
         lang = lang_by_slug.get(row["languageSlug"])

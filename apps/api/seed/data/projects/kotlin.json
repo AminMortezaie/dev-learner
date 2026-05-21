@@ -1,0 +1,512 @@
+[
+  {
+    "languageSlug": "kotlin",
+    "slug": "contact-book",
+    "title": "Contact Book",
+    "description": "Manage contacts with a Kotlin data class and mutable list.",
+    "difficulty": "beginner",
+    "codeLanguage": "kotlin",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Contact data class",
+        "goal": "Model defined.",
+        "instructions": "Create `data class Contact(val id: Int, val name: String, val phone: String)`.",
+        "snippets": [
+          {
+            "path": "Contact.kt",
+            "action": "create",
+            "label": "Contact.kt",
+            "code": "data class Contact(val id: Int, val name: String, val phone: String)\n"
+          }
+        ]
+      },
+      {
+        "title": "Book store",
+        "goal": "Mutable list.",
+        "instructions": "Wrap contacts in a `ContactBook` with add and find.",
+        "snippets": [
+          {
+            "path": "ContactBook.kt",
+            "action": "create",
+            "label": "ContactBook.kt",
+            "code": "class ContactBook {\n    private val contacts = mutableListOf<Contact>()\n    private var nextId = 1\n\n    fun add(name: String, phone: String): Contact {\n        val c = Contact(nextId++, name, phone)\n        contacts.add(c)\n        return c\n    }\n\n    fun all(): List<Contact> = contacts.toList()\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Find by name",
+        "goal": "Lookup helper.",
+        "instructions": "Add `findByName` returning nullable contact.",
+        "snippets": [
+          {
+            "path": "ContactBook.kt",
+            "action": "modify",
+            "label": "ContactBook.kt",
+            "code": "class ContactBook {\n    private val contacts = mutableListOf<Contact>()\n    private var nextId = 1\n\n    fun add(name: String, phone: String): Contact {\n        val c = Contact(nextId++, name, phone)\n        contacts.add(c)\n        return c\n    }\n\n    fun findByName(name: String): Contact? = contacts.firstOrNull { it.name.equals(name, ignoreCase = true) }\n\n    fun all(): List<Contact> = contacts.toList()\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Main demo",
+        "goal": "Print contacts.",
+        "instructions": "Use `main` to add and list contacts.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "create",
+            "label": "Main.kt",
+            "code": "fun main() {\n    val book = ContactBook()\n    book.add(\"Ada\", \"555-0100\")\n    book.add(\"Bob\", \"555-0101\")\n    book.all().forEach { println(it) }\n    println(book.findByName(\"ada\"))\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "kotlin",
+    "slug": "sealed-result-api",
+    "title": "Sealed Result API",
+    "description": "Model API outcomes with a sealed `Result` hierarchy.",
+    "difficulty": "intermediate",
+    "codeLanguage": "kotlin",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Sealed Result",
+        "goal": "Success and Error.",
+        "instructions": "Define `sealed class Result<out T>` with data subclasses.",
+        "snippets": [
+          {
+            "path": "Result.kt",
+            "action": "create",
+            "label": "Result.kt",
+            "code": "sealed class Result<out T> {\n    data class Success<T>(val value: T) : Result<T>()\n    data class Error(val message: String) : Result<Nothing>()\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Safe divide",
+        "goal": "Returning Result.",
+        "instructions": "Implement `divide` returning Success or Error.",
+        "snippets": [
+          {
+            "path": "Math.kt",
+            "action": "create",
+            "label": "Math.kt",
+            "code": "fun divide(a: Int, b: Int): Result<Int> {\n    if (b == 0) return Result.Error(\"divide by zero\")\n    return Result.Success(a / b)\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Map helper",
+        "goal": "Transform success.",
+        "instructions": "Add extension `map` on Result.",
+        "snippets": [
+          {
+            "path": "Result.kt",
+            "action": "modify",
+            "label": "Result.kt",
+            "code": "sealed class Result<out T> {\n    data class Success<T>(val value: T) : Result<T>()\n    data class Error(val message: String) : Result<Nothing>()\n}\n\ninline fun <T, R> Result<T>.map(transform: (T) -> R): Result<R> = when (this) {\n    is Result.Success -> Result.Success(transform(value))\n    is Result.Error -> this\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "When handling",
+        "goal": "Exhaustive branch.",
+        "instructions": "Use `when` in main to print outcomes.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "create",
+            "label": "Main.kt",
+            "code": "fun main() {\n    val r = divide(10, 2).map { it * 2 }\n    when (r) {\n        is Result.Success -> println(\"ok ${r.value}\")\n        is Result.Error -> println(\"err ${r.message}\")\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "kotlin",
+    "slug": "coroutine-news-fetcher",
+    "title": "Coroutine News Fetcher",
+    "description": "Fetch headlines concurrently with coroutines.",
+    "difficulty": "intermediate",
+    "codeLanguage": "kotlin",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Suspend fetch",
+        "goal": "Fake network.",
+        "instructions": "Add `suspend fun fetchHeadline(id: Int)` with `delay`.",
+        "snippets": [
+          {
+            "path": "News.kt",
+            "action": "create",
+            "label": "News.kt",
+            "code": "import kotlinx.coroutines.delay\n\nsuspend fun fetchHeadline(id: Int): String {\n    delay(300)\n    return \"Headline-$id\"\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Sequential run",
+        "goal": "runBlocking.",
+        "instructions": "Call fetches one by one in `main`.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "create",
+            "label": "Main.kt",
+            "code": "import kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val a = fetchHeadline(1)\n    val b = fetchHeadline(2)\n    println(a)\n    println(b)\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Async parallel",
+        "goal": "async/await.",
+        "instructions": "Launch two `async` jobs and await both.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "modify",
+            "label": "Main.kt",
+            "code": "import kotlinx.coroutines.async\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val d1 = async { fetchHeadline(1) }\n    val d2 = async { fetchHeadline(2) }\n    println(d1.await())\n    println(d2.await())\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Launch many",
+        "goal": "Structured concurrency.",
+        "instructions": "Use `coroutineScope` to fetch a list of ids.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "modify",
+            "label": "Main.kt",
+            "code": "import kotlinx.coroutines.async\nimport kotlinx.coroutines.coroutineScope\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val ids = listOf(1, 2, 3)\n    val headlines = coroutineScope {\n        ids.map { id -> async { fetchHeadline(id) } }.map { it.await() }\n    }\n    headlines.forEach { println(it) }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "kotlin",
+    "slug": "flow-ticker",
+    "title": "Flow Ticker",
+    "description": "Emit periodic ticks with Kotlin Flow.",
+    "difficulty": "intermediate",
+    "codeLanguage": "kotlin",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Flow builder",
+        "goal": "tick flow.",
+        "instructions": "Create `tickerFlow(intervalMs)` using `flow` builder.",
+        "snippets": [
+          {
+            "path": "Ticker.kt",
+            "action": "create",
+            "label": "Ticker.kt",
+            "code": "import kotlinx.coroutines.delay\nimport kotlinx.coroutines.flow.flow\n\nfun tickerFlow(intervalMs: Long) = flow {\n    var n = 0\n    while (true) {\n        emit(n++)\n        delay(intervalMs)\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Collect ticks",
+        "goal": "take operator.",
+        "instructions": "Collect first 5 emissions in `main`.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "create",
+            "label": "Main.kt",
+            "code": "import kotlinx.coroutines.flow.take\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    tickerFlow(100).take(5).collect { println(\"tick $it\") }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Map ticks",
+        "goal": "Transform values.",
+        "instructions": "Map ticks to formatted strings before collect.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "modify",
+            "label": "Main.kt",
+            "code": "import kotlinx.coroutines.flow.map\nimport kotlinx.coroutines.flow.take\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    tickerFlow(50)\n        .take(5)\n        .map { \"tick-$it\" }\n        .collect { println(it) }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Cancel on timeout",
+        "goal": "withTimeout.",
+        "instructions": "Stop collection after 400ms with `withTimeout`.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "modify",
+            "label": "Main.kt",
+            "code": "import kotlinx.coroutines.flow.map\nimport kotlinx.coroutines.runBlocking\nimport kotlinx.coroutines.withTimeout\n\nfun main() = runBlocking {\n    withTimeout(400) {\n        tickerFlow(100).map { \"tick-$it\" }.collect { println(it) }\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "kotlin",
+    "slug": "ktor-style-routes",
+    "title": "Ktor-Style Routes (Manual)",
+    "description": "Simulate HTTP routing with a map of path handlers \u2014 no Ktor dependency.",
+    "difficulty": "intermediate",
+    "codeLanguage": "kotlin",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Request/Response",
+        "goal": "Simple types.",
+        "instructions": "Define `Request` and `Response` data classes.",
+        "snippets": [
+          {
+            "path": "Http.kt",
+            "action": "create",
+            "label": "Http.kt",
+            "code": "data class Request(val method: String, val path: String)\ndata class Response(val status: Int, val body: String)\n"
+          }
+        ]
+      },
+      {
+        "title": "Router map",
+        "goal": "Register routes.",
+        "instructions": "Build `Router` with `get` and `post` helpers storing lambdas.",
+        "snippets": [
+          {
+            "path": "Router.kt",
+            "action": "create",
+            "label": "Router.kt",
+            "code": "typealias Handler = (Request) -> Response\n\nclass Router {\n    private val routes = mutableMapOf<Pair<String, String>, Handler>()\n\n    fun get(path: String, handler: Handler) { routes[\"GET\" to path] = handler }\n    fun post(path: String, handler: Handler) { routes[\"POST\" to path] = handler }\n\n    fun handle(req: Request): Response {\n        val handler = routes[req.method to req.path]\n        return handler?.invoke(req) ?: Response(404, \"not found\")\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Article routes",
+        "goal": "CRUD stubs.",
+        "instructions": "Register `/articles` GET and POST handlers.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "create",
+            "label": "Main.kt",
+            "code": "fun main() {\n    val router = Router()\n    val articles = mutableListOf<String>()\n\n    router.get(\"/articles\") { Response(200, articles.joinToString(\",\")) }\n    router.post(\"/articles\") {\n        articles.add(\"item-${articles.size + 1}\")\n        Response(201, \"created\")\n    }\n\n    println(router.handle(Request(\"GET\", \"/articles\")))\n    println(router.handle(Request(\"POST\", \"/articles\")))\n    println(router.handle(Request(\"GET\", \"/articles\")))\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Path params",
+        "goal": "Extract id.",
+        "instructions": "Parse `/articles/{id}` style paths manually.",
+        "snippets": [
+          {
+            "path": "Router.kt",
+            "action": "modify",
+            "label": "Router.kt",
+            "code": "typealias Handler = (Request) -> Response\n\nclass Router {\n    private val routes = mutableMapOf<Pair<String, String>, Handler>()\n\n    fun get(path: String, handler: Handler) { routes[\"GET\" to path] = handler }\n\n    fun handle(req: Request): Response {\n        routes[req.method to req.path]?.let { return it(req) }\n        if (req.method == \"GET\" && req.path.startsWith(\"/articles/\")) {\n            val id = req.path.removePrefix(\"/articles/\")\n            return Response(200, \"article-$id\")\n        }\n        return Response(404, \"not found\")\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "kotlin",
+    "slug": "channel-pipeline",
+    "title": "Channel Pipeline",
+    "description": "Move work through a Channel from producer to consumer.",
+    "difficulty": "intermediate",
+    "codeLanguage": "kotlin",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Channel create",
+        "goal": "Buffered channel.",
+        "instructions": "Open a `Channel<String>` with capacity 5.",
+        "snippets": [
+          {
+            "path": "Pipeline.kt",
+            "action": "create",
+            "label": "Pipeline.kt",
+            "code": "import kotlinx.coroutines.channels.Channel\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val ch = Channel<String>(5)\n    ch.close()\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Producer coroutine",
+        "goal": "Send items.",
+        "instructions": "Launch a producer that sends 5 messages.",
+        "snippets": [
+          {
+            "path": "Pipeline.kt",
+            "action": "modify",
+            "label": "Pipeline.kt",
+            "code": "import kotlinx.coroutines.channels.Channel\nimport kotlinx.coroutines.launch\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val ch = Channel<String>(5)\n    launch {\n        repeat(5) { i -> ch.send(\"msg-$i\") }\n        ch.close()\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Consumer loop",
+        "goal": "Receive until closed.",
+        "instructions": "Consume with `for (msg in ch)`.",
+        "snippets": [
+          {
+            "path": "Pipeline.kt",
+            "action": "modify",
+            "label": "Pipeline.kt",
+            "code": "import kotlinx.coroutines.channels.Channel\nimport kotlinx.coroutines.launch\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val ch = Channel<String>(5)\n    launch {\n        repeat(5) { i -> ch.send(\"msg-$i\") }\n        ch.close()\n    }\n    launch {\n        for (msg in ch) println(\"got $msg\")\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Pipeline stages",
+        "goal": "Map in middle.",
+        "instructions": "Add a middle coroutine that uppercases messages.",
+        "snippets": [
+          {
+            "path": "Pipeline.kt",
+            "action": "modify",
+            "label": "Pipeline.kt",
+            "code": "import kotlinx.coroutines.channels.Channel\nimport kotlinx.coroutines.launch\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val raw = Channel<String>(5)\n    val processed = Channel<String>(5)\n\n    launch {\n        repeat(3) { i -> raw.send(\"msg-$i\") }\n        raw.close()\n    }\n    launch {\n        for (msg in raw) processed.send(msg.uppercase())\n        processed.close()\n    }\n    launch {\n        for (msg in processed) println(msg)\n    }\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "kotlin",
+    "slug": "dsl-query-builder",
+    "title": "DSL Query Builder",
+    "description": "Build SQL-like queries with a type-safe Kotlin DSL.",
+    "difficulty": "intermediate",
+    "codeLanguage": "kotlin",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Query model",
+        "goal": "Data classes.",
+        "instructions": "Define `Query` with table, columns, and where clause.",
+        "snippets": [
+          {
+            "path": "Query.kt",
+            "action": "create",
+            "label": "Query.kt",
+            "code": "data class Query(\n    val table: String,\n    val columns: List<String> = listOf(\"*\"),\n    val where: String? = null,\n)\n"
+          }
+        ]
+      },
+      {
+        "title": "Builder class",
+        "goal": "Fluent API.",
+        "instructions": "Add `QueryBuilder` with `select`, `from`, `where`.",
+        "snippets": [
+          {
+            "path": "QueryBuilder.kt",
+            "action": "create",
+            "label": "QueryBuilder.kt",
+            "code": "class QueryBuilder {\n    private var table: String = \"\"\n    private val columns = mutableListOf<String>()\n    private var where: String? = null\n\n    fun select(vararg cols: String) = apply { columns.addAll(cols) }\n    fun from(t: String) = apply { table = t }\n    fun where(clause: String) = apply { where = clause }\n\n    fun build(): Query = Query(table, columns.ifEmpty { listOf(\"*\") }, where)\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Lambda DSL",
+        "goal": "Receiver function.",
+        "instructions": "Add `query { }` top-level with `@DslMarker`.",
+        "snippets": [
+          {
+            "path": "QueryDsl.kt",
+            "action": "create",
+            "label": "QueryDsl.kt",
+            "code": "@DslMarker\nannotation class QueryDsl\n\n@QueryDsl\nclass QueryDslBuilder {\n    private val inner = QueryBuilder()\n    fun select(vararg cols: String) = inner.select(*cols)\n    fun from(table: String) = inner.from(table)\n    fun where(clause: String) = inner.where(clause)\n    fun build() = inner.build()\n}\n\nfun query(block: QueryDslBuilder.() -> Unit): Query {\n    val b = QueryDslBuilder()\n    b.block()\n    return b.build()\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Render SQL",
+        "goal": "toSql extension.",
+        "instructions": "Print SQL string from built query.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "create",
+            "label": "Main.kt",
+            "code": "fun Query.toSql(): String {\n    val cols = columns.joinToString(\", \")\n    val base = \"SELECT $cols FROM $table\"\n    return if (where != null) \"$base WHERE $where\" else base\n}\n\nfun main() {\n    val q = query {\n        select(\"id\", \"name\")\n        from(\"users\")\n        where(\"active = 1\")\n    }\n    println(q.toSql())\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "kotlin",
+    "slug": "coroutine-rate-limiter",
+    "title": "Coroutine Rate Limiter",
+    "description": "Throttle requests with delay and a semaphore-style permit bucket.",
+    "difficulty": "intermediate",
+    "codeLanguage": "kotlin",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "RateLimiter class",
+        "goal": "Permit counter.",
+        "instructions": "Track available permits and refill delay.",
+        "snippets": [
+          {
+            "path": "RateLimiter.kt",
+            "action": "create",
+            "label": "RateLimiter.kt",
+            "code": "import kotlinx.coroutines.delay\nimport kotlinx.coroutines.sync.Mutex\nimport kotlinx.coroutines.sync.withLock\n\nclass RateLimiter(private val maxPermits: Int, private val refillMs: Long) {\n    private var permits = maxPermits\n    private val mutex = Mutex()\n\n    suspend fun acquire() = mutex.withLock {\n        while (permits == 0) {\n            mutex.unlock()\n            delay(refillMs)\n            mutex.lock()\n            permits = maxPermits\n        }\n        permits--\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Acquire before work",
+        "goal": "Guarded call.",
+        "instructions": "Wrap fake API call with `acquire()`.",
+        "snippets": [
+          {
+            "path": "Api.kt",
+            "action": "create",
+            "label": "Api.kt",
+            "code": "import kotlinx.coroutines.delay\n\nsuspend fun callApi(id: Int): String {\n    delay(100)\n    return \"response-$id\"\n}\n"
+          },
+          {
+            "path": "Main.kt",
+            "action": "create",
+            "label": "Main.kt",
+            "code": "import kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val limiter = RateLimiter(maxPermits = 2, refillMs = 500)\n    repeat(4) { id ->\n        limiter.acquire()\n        println(callApi(id))\n    }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Semaphore version",
+        "goal": " kotlinx Semaphore.",
+        "instructions": "Alternate implementation using `Semaphore`.",
+        "snippets": [
+          {
+            "path": "RateLimiter.kt",
+            "action": "modify",
+            "label": "RateLimiter.kt",
+            "code": "import kotlinx.coroutines.sync.Semaphore\nimport kotlinx.coroutines.sync.withPermit\n\nclass RateLimiter(private val maxPermits: Int) {\n    private val sem = Semaphore(maxPermits)\n\n    suspend fun <T> withLimit(block: suspend () -> T): T = sem.withPermit { block() }\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Parallel jobs",
+        "goal": "Limited launch.",
+        "instructions": "Launch 6 jobs but only 2 run at once.",
+        "snippets": [
+          {
+            "path": "Main.kt",
+            "action": "modify",
+            "label": "Main.kt",
+            "code": "import kotlinx.coroutines.async\nimport kotlinx.coroutines.awaitAll\nimport kotlinx.coroutines.runBlocking\n\nfun main() = runBlocking {\n    val limiter = RateLimiter(2)\n    val jobs = (1..6).map { id ->\n        async {\n            limiter.withLimit {\n                println(\"start $id\")\n                callApi(id)\n            }\n        }\n    }\n    jobs.awaitAll().forEach { println(it) }\n}\n"
+          }
+        ]
+      }
+    ]
+  }
+]

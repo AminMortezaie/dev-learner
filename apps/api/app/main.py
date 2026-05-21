@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.migrate import run_migrations
 from app.routers import api_router
 
 logging.basicConfig(level=logging.INFO)
@@ -52,4 +53,7 @@ async def unhandled_handler(_request: Request, exc: Exception) -> JSONResponse:
 async def startup() -> None:
     port = int(os.environ.get("PORT", "5000"))
     has_db = bool(os.environ.get("DATABASE_URL"))
+    if has_db:
+        logger.info("applying database migrations")
+        run_migrations()
     logger.info("api listening on port=%s has_database_url=%s", port, has_db)

@@ -1,0 +1,530 @@
+[
+  {
+    "languageSlug": "python",
+    "slug": "async-fetcher",
+    "title": "Async URL Fetcher",
+    "description": "Build a minimal concurrent URL fetcher using asyncio \u2014 from a sync script to gathered tasks, then split across files.",
+    "difficulty": "intermediate",
+    "codeLanguage": "python",
+    "playgroundUrl": "https://www.online-python.com/",
+    "steps": [
+      {
+        "title": "Synchronous baseline",
+        "goal": "Fetch two URLs sequentially with httpx in a plain script.",
+        "instructions": "Start with the simplest version: a `main()` that calls a blocking `fetch` twice. This is the baseline we will make concurrent.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "create",
+            "label": "Blocking fetch script",
+            "code": "import httpx\n\nURLS = [\n    \"https://httpbin.org/get\",\n    \"https://httpbin.org/delay/1\",\n]\n\n\ndef fetch(client: httpx.Client, url: str) -> int:\n    response = client.get(url, timeout=10.0)\n    response.raise_for_status()\n    return response.status_code\n\n\ndef main() -> None:\n    with httpx.Client() as client:\n        for url in URLS:\n            status = fetch(client, url)\n            print(url, status)\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      },
+      {
+        "title": "Async fetch coroutine",
+        "goal": "Replace blocking calls with `async def` and `AsyncClient`.",
+        "instructions": "Convert `fetch` to a coroutine using `httpx.AsyncClient`. Drive the event loop with `asyncio.run(main())`.\n\nStill fetch URLs one after another \u2014 concurrency comes next.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "Async main and fetch",
+            "code": "import asyncio\nimport httpx\n\nURLS = [\n    \"https://httpbin.org/get\",\n    \"https://httpbin.org/delay/1\",\n]\n\n\nasync def fetch(client: httpx.AsyncClient, url: str) -> int:\n    response = await client.get(url, timeout=10.0)\n    response.raise_for_status()\n    return response.status_code\n\n\nasync def main() -> None:\n    async with httpx.AsyncClient() as client:\n        for url in URLS:\n            status = await fetch(client, url)\n            print(url, status)\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      },
+      {
+        "title": "Concurrent gather",
+        "goal": "Run all fetches concurrently with `asyncio.gather`.",
+        "instructions": "Build a list of coroutines and pass them to `asyncio.gather`. Total time should be close to the **slowest** URL, not the sum.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "Gather all tasks",
+            "code": "import asyncio\nimport httpx\n\nURLS = [\n    \"https://httpbin.org/get\",\n    \"https://httpbin.org/delay/1\",\n]\n\n\nasync def fetch(client: httpx.AsyncClient, url: str) -> int:\n    response = await client.get(url, timeout=10.0)\n    response.raise_for_status()\n    return response.status_code\n\n\nasync def main() -> None:\n    async with httpx.AsyncClient() as client:\n        tasks = [fetch(client, url) for url in URLS]\n        statuses = await asyncio.gather(*tasks)\n        for url, status in zip(URLS, statuses):\n            print(url, status)\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      },
+      {
+        "title": "Split files and bound concurrency",
+        "goal": "Extract fetch logic to `fetcher.py` and cap in-flight requests from `main.py`.",
+        "instructions": "Larger apps split responsibilities across files. Move the fetch helper to **`fetcher.py`**, keep orchestration in **`main.py`**, and use `asyncio.Semaphore` in main to limit concurrency \u2014 the same idea as a worker pool.\n\nCreate both files in the same directory and run `python main.py`.",
+        "snippets": [
+          {
+            "path": "fetcher.py",
+            "action": "create",
+            "label": "New file \u2014 fetch helper",
+            "code": "import httpx\n\n\nasync def fetch(client: httpx.AsyncClient, url: str) -> int:\n    response = await client.get(url, timeout=10.0)\n    response.raise_for_status()\n    return response.status_code\n"
+          },
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "Wire semaphore in main",
+            "code": "import asyncio\nimport httpx\n\nfrom fetcher import fetch\n\nURLS = [\n    \"https://httpbin.org/get\",\n    \"https://httpbin.org/delay/1\",\n    \"https://httpbin.org/delay/1\",\n    \"https://httpbin.org/get\",\n]\n\nMAX_CONCURRENT = 2\n\n\nasync def fetch_bounded(\n    client: httpx.AsyncClient, sem: asyncio.Semaphore, url: str\n) -> int:\n    async with sem:\n        print(\"fetching\", url)\n        return await fetch(client, url)\n\n\nasync def main() -> None:\n    sem = asyncio.Semaphore(MAX_CONCURRENT)\n    async with httpx.AsyncClient() as client:\n        tasks = [fetch_bounded(client, sem, url) for url in URLS]\n        statuses = await asyncio.gather(*tasks)\n        for url, status in zip(URLS, statuses):\n            print(url, status)\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "python",
+    "slug": "fastapi-crud-layout",
+    "title": "FastAPI CRUD Layout",
+    "description": "Structure a FastAPI app with routers, schemas, and an in-memory article store.",
+    "difficulty": "intermediate",
+    "codeLanguage": "python",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "App entry",
+        "goal": "FastAPI instance.",
+        "instructions": "Create `app/main.py` with a health route.",
+        "snippets": [
+          {
+            "path": "app/main.py",
+            "action": "create",
+            "label": "app/main.py",
+            "code": "from fastapi import FastAPI\n\napp = FastAPI(title=\"Articles API\")\n\n\n@app.get(\"/health\")\ndef health():\n    return {\"status\": \"ok\"}\n"
+          }
+        ]
+      },
+      {
+        "title": "Schemas",
+        "goal": "Pydantic models.",
+        "instructions": "Add `ArticleCreate` and `ArticleOut` in `app/schemas.py`.",
+        "snippets": [
+          {
+            "path": "app/schemas.py",
+            "action": "create",
+            "label": "app/schemas.py",
+            "code": "from pydantic import BaseModel\n\n\nclass ArticleCreate(BaseModel):\n    title: str\n    body: str\n\n\nclass ArticleOut(ArticleCreate):\n    id: int\n"
+          }
+        ]
+      },
+      {
+        "title": "Router",
+        "goal": "List and create.",
+        "instructions": "Implement GET/POST `/articles` in `app/routers/articles.py`.",
+        "snippets": [
+          {
+            "path": "app/routers/articles.py",
+            "action": "create",
+            "label": "app/routers/articles.py",
+            "code": "from fastapi import APIRouter\nfrom app.schemas import ArticleCreate, ArticleOut\n\nrouter = APIRouter(prefix=\"/articles\", tags=[\"articles\"])\n_store: list[ArticleOut] = []\n_next_id = 1\n\n\n@router.get(\"\", response_model=list[ArticleOut])\ndef list_articles():\n    return _store\n\n\n@router.post(\"\", response_model=ArticleOut, status_code=201)\ndef create_article(payload: ArticleCreate):\n    global _next_id\n    item = ArticleOut(id=_next_id, **payload.model_dump())\n    _next_id += 1\n    _store.append(item)\n    return item\n"
+          }
+        ]
+      },
+      {
+        "title": "Wire router",
+        "goal": "Include in app.",
+        "instructions": "Register the articles router from `main.py`.",
+        "snippets": [
+          {
+            "path": "app/main.py",
+            "action": "modify",
+            "label": "app/main.py",
+            "code": "from fastapi import FastAPI\nfrom app.routers.articles import router as articles_router\n\napp = FastAPI(title=\"Articles API\")\napp.include_router(articles_router)\n\n\n@app.get(\"/health\")\ndef health():\n    return {\"status\": \"ok\"}\n"
+          },
+          {
+            "path": "app/__init__.py",
+            "action": "create",
+            "label": "app/__init__.py",
+            "code": ""
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "python",
+    "slug": "argparse-cli",
+    "title": "Argparse Greet CLI",
+    "description": "Build a small CLI with `argparse` for greeting users.",
+    "difficulty": "beginner",
+    "codeLanguage": "python",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Basic main",
+        "goal": "Script runs.",
+        "instructions": "Create `main.py` that prints hello.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "create",
+            "label": "main.py",
+            "code": "def main() -> None:\n    print(\"hello\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      },
+      {
+        "title": "Argparse name",
+        "goal": "Required --name.",
+        "instructions": "Parse `--name` with argparse.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "main.py",
+            "code": "import argparse\n\n\ndef main() -> None:\n    parser = argparse.ArgumentParser(description=\"Greet CLI\")\n    parser.add_argument(\"--name\", required=True, help=\"person to greet\")\n    args = parser.parse_args()\n    print(f\"Hello, {args.name}!\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      },
+      {
+        "title": "Optional count",
+        "goal": "Repeat greeting.",
+        "instructions": "Add `--count` defaulting to 1.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "main.py",
+            "code": "import argparse\n\n\ndef main() -> None:\n    parser = argparse.ArgumentParser(description=\"Greet CLI\")\n    parser.add_argument(\"--name\", required=True)\n    parser.add_argument(\"--count\", type=int, default=1)\n    args = parser.parse_args()\n    for _ in range(args.count):\n        print(f\"Hello, {args.name}!\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      },
+      {
+        "title": "Uppercase flag",
+        "goal": "Style toggle.",
+        "instructions": "Add `--shout` to uppercase the greeting.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "main.py",
+            "code": "import argparse\n\n\ndef greet(name: str, shout: bool) -> str:\n    msg = f\"Hello, {name}!\"\n    return msg.upper() if shout else msg\n\n\ndef main() -> None:\n    parser = argparse.ArgumentParser(description=\"Greet CLI\")\n    parser.add_argument(\"--name\", required=True)\n    parser.add_argument(\"--count\", type=int, default=1)\n    parser.add_argument(\"--shout\", action=\"store_true\")\n    args = parser.parse_args()\n    for _ in range(args.count):\n        print(greet(args.name, args.shout))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "python",
+    "slug": "dataclass-domain",
+    "title": "Dataclass Order Domain",
+    "description": "Model orders with dataclasses and simple validation.",
+    "difficulty": "beginner",
+    "codeLanguage": "python",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Order dataclass",
+        "goal": "Fields defined.",
+        "instructions": "Create `Order` with id, sku, and quantity.",
+        "snippets": [
+          {
+            "path": "order.py",
+            "action": "create",
+            "label": "order.py",
+            "code": "from dataclasses import dataclass\n\n\n@dataclass\nclass Order:\n    id: int\n    sku: str\n    quantity: int\n"
+          }
+        ]
+      },
+      {
+        "title": "Validation",
+        "goal": "Post-init checks.",
+        "instructions": "Reject non-positive quantity in `__post_init__`.",
+        "snippets": [
+          {
+            "path": "order.py",
+            "action": "modify",
+            "label": "order.py",
+            "code": "from dataclasses import dataclass\n\n\n@dataclass\nclass Order:\n    id: int\n    sku: str\n    quantity: int\n\n    def __post_init__(self) -> None:\n        if self.quantity <= 0:\n            raise ValueError(\"quantity must be positive\")\n        if not self.sku:\n            raise ValueError(\"sku required\")\n"
+          }
+        ]
+      },
+      {
+        "title": "Total price",
+        "goal": "Computed property.",
+        "instructions": "Add `line_total` using a unit price argument.",
+        "snippets": [
+          {
+            "path": "order.py",
+            "action": "modify",
+            "label": "order.py",
+            "code": "from dataclasses import dataclass\n\n\n@dataclass\nclass Order:\n    id: int\n    sku: str\n    quantity: int\n    unit_price: float\n\n    def __post_init__(self) -> None:\n        if self.quantity <= 0:\n            raise ValueError(\"quantity must be positive\")\n\n    @property\n    def line_total(self) -> float:\n        return self.quantity * self.unit_price\n"
+          }
+        ]
+      },
+      {
+        "title": "Demo main",
+        "goal": "Create orders.",
+        "instructions": "Instantiate orders and print totals in `main.py`.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "create",
+            "label": "main.py",
+            "code": "from order import Order\n\n\ndef main() -> None:\n    orders = [\n        Order(1, \"BOOK-1\", 2, 9.99),\n        Order(2, \"PEN-3\", 5, 1.50),\n    ]\n    for o in orders:\n        print(o.sku, o.line_total)\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "python",
+    "slug": "decorator-retry",
+    "title": "Retry Decorator",
+    "description": "Wrap flaky functions with a retry decorator.",
+    "difficulty": "intermediate",
+    "codeLanguage": "python",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Flaky function",
+        "goal": "Random failure.",
+        "instructions": "Implement `unstable()` that fails sometimes.",
+        "snippets": [
+          {
+            "path": "flaky.py",
+            "action": "create",
+            "label": "flaky.py",
+            "code": "import random\n\n\ndef unstable() -> str:\n    if random.random() < 0.7:\n        raise RuntimeError(\"temporary failure\")\n    return \"ok\"\n"
+          }
+        ]
+      },
+      {
+        "title": "Retry decorator",
+        "goal": "Attempts loop.",
+        "instructions": "Create `retry(times, delay)` decorator.",
+        "snippets": [
+          {
+            "path": "retry.py",
+            "action": "create",
+            "label": "retry.py",
+            "code": "import time\nfrom functools import wraps\nfrom typing import Callable, TypeVar\n\nT = TypeVar(\"T\")\n\n\ndef retry(times: int = 3, delay: float = 0.1) -> Callable[[Callable[..., T]], Callable[..., T]]:\n    def decorator(fn: Callable[..., T]) -> Callable[..., T]:\n        @wraps(fn)\n        def wrapper(*args, **kwargs) -> T:\n            last: Exception | None = None\n            for attempt in range(1, times + 1):\n                try:\n                    return fn(*args, **kwargs)\n                except Exception as exc:\n                    last = exc\n                    time.sleep(delay)\n            raise last  # type: ignore[misc]\n        return wrapper\n    return decorator\n"
+          }
+        ]
+      },
+      {
+        "title": "Apply decorator",
+        "goal": "Stable call.",
+        "instructions": "Decorate `unstable` and call from main.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "create",
+            "label": "main.py",
+            "code": "from flaky import unstable\nfrom retry import retry\n\n\n@retry(times=5, delay=0.05)\ndef stable_unstable() -> str:\n    return unstable()\n\n\ndef main() -> None:\n    print(stable_unstable())\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      },
+      {
+        "title": "Logging attempts",
+        "goal": "Observe retries.",
+        "instructions": "Print attempt number before re-raising.",
+        "snippets": [
+          {
+            "path": "retry.py",
+            "action": "modify",
+            "label": "retry.py",
+            "code": "import time\nfrom functools import wraps\nfrom typing import Callable, TypeVar\n\nT = TypeVar(\"T\")\n\n\ndef retry(times: int = 3, delay: float = 0.1) -> Callable[[Callable[..., T]], Callable[..., T]]:\n    def decorator(fn: Callable[..., T]) -> Callable[..., T]:\n        @wraps(fn)\n        def wrapper(*args, **kwargs) -> T:\n            last: Exception | None = None\n            for attempt in range(1, times + 1):\n                try:\n                    return fn(*args, **kwargs)\n                except Exception as exc:\n                    last = exc\n                    print(f\"retry {attempt}/{times} after {exc}\")\n                    time.sleep(delay)\n            raise last  # type: ignore[misc]\n        return wrapper\n    return decorator\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "python",
+    "slug": "asyncio-task-queue",
+    "title": "Asyncio Task Queue",
+    "description": "Process jobs with asyncio workers backed by a Queue.",
+    "difficulty": "intermediate",
+    "codeLanguage": "python",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Queue setup",
+        "goal": "Async queue.",
+        "instructions": "Create `asyncio.Queue` and enqueue sample jobs.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "create",
+            "label": "main.py",
+            "code": "import asyncio\n\n\nasync def main() -> None:\n    q: asyncio.Queue[str] = asyncio.Queue()\n    for i in range(3):\n        await q.put(f\"job-{i}\")\n    print(\"queued\", q.qsize())\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      },
+      {
+        "title": "Worker coroutine",
+        "goal": "Consume jobs.",
+        "instructions": "Implement `worker` that processes until sentinel.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "main.py",
+            "code": "import asyncio\n\nSTOP = None\n\n\nasync def worker(name: str, q: asyncio.Queue) -> None:\n    while True:\n        job = await q.get()\n        if job is STOP:\n            q.task_done()\n            break\n        print(name, \"processing\", job)\n        await asyncio.sleep(0.1)\n        q.task_done()\n"
+          }
+        ]
+      },
+      {
+        "title": "Start workers",
+        "goal": "Multiple consumers.",
+        "instructions": "Spawn two workers and wait on `queue.join()`.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "main.py",
+            "code": "import asyncio\n\nSTOP = None\n\n\nasync def worker(name: str, q: asyncio.Queue) -> None:\n    while True:\n        job = await q.get()\n        if job is STOP:\n            q.task_done()\n            break\n        print(name, \"processing\", job)\n        await asyncio.sleep(0.1)\n        q.task_done()\n\n\nasync def main() -> None:\n    q: asyncio.Queue = asyncio.Queue()\n    workers = [asyncio.create_task(worker(f\"w{i}\", q)) for i in range(2)]\n    for i in range(5):\n        await q.put(f\"job-{i}\")\n    for _ in workers:\n        await q.put(STOP)\n    await q.join()\n    await asyncio.gather(*workers)\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      },
+      {
+        "title": "Producer task",
+        "goal": "Enqueue concurrently.",
+        "instructions": "Add a producer coroutine that feeds the queue.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "main.py",
+            "code": "import asyncio\n\nSTOP = None\n\n\nasync def producer(q: asyncio.Queue) -> None:\n    for i in range(5):\n        await q.put(f\"job-{i}\")\n    for _ in range(2):\n        await q.put(STOP)\n\n\nasync def worker(name: str, q: asyncio.Queue) -> None:\n    while True:\n        job = await q.get()\n        if job is STOP:\n            q.task_done()\n            break\n        print(name, job)\n        q.task_done()\n\n\nasync def main() -> None:\n    q: asyncio.Queue = asyncio.Queue()\n    workers = [asyncio.create_task(worker(f\"w{i}\", q)) for i in range(2)]\n    await asyncio.gather(producer(q), *workers)\n    await q.join()\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "python",
+    "slug": "mini-redis-parser",
+    "title": "Mini Redis Parser",
+    "description": "Parse simple Redis-style commands: PING, SET, GET.",
+    "difficulty": "intermediate",
+    "codeLanguage": "python",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Tokenize input",
+        "goal": "Split words.",
+        "instructions": "Parse a command line into tokens.",
+        "snippets": [
+          {
+            "path": "parser.py",
+            "action": "create",
+            "label": "parser.py",
+            "code": "def tokenize(line: str) -> list[str]:\n    return line.strip().split()\n"
+          }
+        ]
+      },
+      {
+        "title": "Command enum",
+        "goal": "Known verbs.",
+        "instructions": "Map tokens to command name and args.",
+        "snippets": [
+          {
+            "path": "parser.py",
+            "action": "modify",
+            "label": "parser.py",
+            "code": "from dataclasses import dataclass\n\n\ndef tokenize(line: str) -> list[str]:\n    return line.strip().split()\n\n\n@dataclass\nclass Command:\n    name: str\n    args: list[str]\n\n\ndef parse(line: str) -> Command:\n    parts = tokenize(line)\n    if not parts:\n        raise ValueError(\"empty command\")\n    return Command(parts[0].upper(), parts[1:])\n"
+          }
+        ]
+      },
+      {
+        "title": "In-memory store",
+        "goal": "SET/GET.",
+        "instructions": "Implement a dict-backed store in `server.py`.",
+        "snippets": [
+          {
+            "path": "server.py",
+            "action": "create",
+            "label": "server.py",
+            "code": "from parser import Command, parse\n\n_store: dict[str, str] = {}\n\n\ndef execute(cmd: Command) -> str:\n    if cmd.name == \"PING\":\n        return \"PONG\"\n    if cmd.name == \"SET\":\n        key, value = cmd.args\n        _store[key] = value\n        return \"OK\"\n    if cmd.name == \"GET\":\n        key = cmd.args[0]\n        return _store.get(key, \"\")\n    raise ValueError(f\"unknown {cmd.name}\")\n\n\ndef handle_line(line: str) -> str:\n    return execute(parse(line))\n"
+          }
+        ]
+      },
+      {
+        "title": "REPL loop",
+        "goal": "Interactive shell.",
+        "instructions": "Read lines in `main.py` until quit.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "create",
+            "label": "main.py",
+            "code": "from server import handle_line\n\n\ndef main() -> None:\n    print(\"mini-redis. commands: PING, SET k v, GET k, QUIT\")\n    while True:\n        line = input(\"> \").strip()\n        if line.upper() == \"QUIT\":\n            break\n        try:\n            print(handle_line(line))\n        except Exception as exc:\n            print(\"ERR\", exc)\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "python",
+    "slug": "app-package-tree",
+    "title": "App Package Tree",
+    "description": "Organize a small Python app like DevLearn with main, routers, and services.",
+    "difficulty": "intermediate",
+    "codeLanguage": "python",
+    "playgroundUrl": null,
+    "steps": [
+      {
+        "title": "Package layout",
+        "goal": "app package.",
+        "instructions": "Create `app/main.py` and empty `app/__init__.py`.",
+        "snippets": [
+          {
+            "path": "app/__init__.py",
+            "action": "create",
+            "label": "app/__init__.py",
+            "code": ""
+          },
+          {
+            "path": "app/main.py",
+            "action": "create",
+            "label": "app/main.py",
+            "code": "from app.routers.health import health_router\n\n\ndef create_app():\n    routes = [health_router]\n    return routes\n\n\ndef main() -> None:\n    print(\"routes\", [r.path for r in create_app()])\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      },
+      {
+        "title": "Health router",
+        "goal": "Route object.",
+        "instructions": "Define a simple `Route` dataclass and `/health`.",
+        "snippets": [
+          {
+            "path": "app/routers/health.py",
+            "action": "create",
+            "label": "app/routers/health.py",
+            "code": "from dataclasses import dataclass\nfrom typing import Callable\n\n\n@dataclass\nclass Route:\n    method: str\n    path: str\n    handler: Callable[[], dict]\n\n\ndef health() -> dict:\n    return {\"status\": \"ok\"}\n\n\nhealth_router = Route(\"GET\", \"/health\", health)\n"
+          }
+        ]
+      },
+      {
+        "title": "Stats service",
+        "goal": "Business logic.",
+        "instructions": "Add `app/services/stats.py` with visit counter.",
+        "snippets": [
+          {
+            "path": "app/services/stats.py",
+            "action": "create",
+            "label": "app/services/stats.py",
+            "code": "class StatsService:\n    def __init__(self) -> None:\n        self.visits = 0\n\n    def record_visit(self) -> int:\n        self.visits += 1\n        return self.visits\n\n    def snapshot(self) -> dict:\n        return {\"visits\": self.visits}\n"
+          }
+        ]
+      },
+      {
+        "title": "Stats route",
+        "goal": "Wire service.",
+        "instructions": "Expose `/stats` using the stats service.",
+        "snippets": [
+          {
+            "path": "app/routers/health.py",
+            "action": "modify",
+            "label": "app/routers/health.py",
+            "code": "from dataclasses import dataclass\nfrom typing import Callable\n\nfrom app.services.stats import StatsService\n\n_stats = StatsService()\n\n\n@dataclass\nclass Route:\n    method: str\n    path: str\n    handler: Callable[[], dict]\n\n\ndef health() -> dict:\n    return {\"status\": \"ok\"}\n\n\ndef stats() -> dict:\n    _stats.record_visit()\n    return _stats.snapshot()\n\n\nhealth_router = Route(\"GET\", \"/health\", health)\nstats_router = Route(\"GET\", \"/stats\", stats)\n"
+          },
+          {
+            "path": "app/main.py",
+            "action": "modify",
+            "label": "app/main.py",
+            "code": "from app.routers.health import health_router, stats_router\n\n\ndef create_app():\n    return [health_router, stats_router]\n\n\ndef main() -> None:\n    for route in create_app():\n        print(route.method, route.path, route.handler())\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      }
+    ]
+  }
+]

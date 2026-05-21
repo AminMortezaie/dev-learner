@@ -1,4 +1,4 @@
-.PHONY: install dev start start-prod test push seed setup
+.PHONY: install dev start start-prod test migrate push seed setup
 
 install:
 	pip install -r requirements.txt
@@ -10,13 +10,16 @@ start:
 	uvicorn app.main:app --host 0.0.0.0 --port $${PORT:-5000}
 
 start-prod:
-	python -m app.cli seed && uvicorn app.main:app --host 0.0.0.0 --port $${PORT:-5000}
+	python -m app.cli migrate && python -m app.cli seed && uvicorn app.main:app --host 0.0.0.0 --port $${PORT:-5000}
 
 test:
 	pytest -q
 
+migrate:
+	python -m app.cli migrate
+
 push:
-	python -m app.cli push
+	python -m app.cli migrate
 
 seed:
 	python -m app.cli seed

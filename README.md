@@ -8,7 +8,7 @@ A developer learning platform for tracking progress across programming languages
 - **Articles** — Write articles in Markdown; polish raw text with AI
 - **AI Quiz Generation** — Auto-generates quizzes from articles
 - **Polish with AI** — Paste raw text; AI reformats it as clean Markdown
-- **Build Projects** — Zero-to-hero walkthroughs with per-step code snippets (single- or multi-file) and local progress
+- **Build Projects** — 32 curated zero-to-hero walkthroughs (8 per language track) with per-step read-only code snippets and local progress
 - **Syntax Lessons** — Side-by-side code examples with syntax highlighting
 - **Resources** — Curated links to articles, videos, docs, and courses
 - **Mobile Responsive** — Full mobile support with hamburger nav drawer
@@ -69,7 +69,7 @@ docker compose up
 | http://localhost:5051 | API |
 | localhost:5432 | PostgreSQL |
 
-The API container runs: `pip install` → `python -m app.cli push` → `python -m app.cli seed` → Uvicorn.
+The API container runs: `pip install` → `python -m app.cli setup` (migrate + seed) → Uvicorn.
 
 ### Local development
 
@@ -117,10 +117,12 @@ Link your Render Postgres database so `DATABASE_URL` is available at build and r
 
 | Setting | Command |
 |---|---|
-| **Build Command** | `pip install -r requirements.txt && python -m app.cli setup` |
-| **Start Command** | `python -m app.cli seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| **Build Command** | `pip install -r requirements.txt && python -m app.cli migrate` |
+| **Start Command** | `python -m app.cli migrate && python -m app.cli seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 
-`setup` runs `push` (create tables) then `seed` (load curated data **only if the database is empty**). `seed` on start is a fast no-op when data already exists, so restarts stay safe.
+**Migrations** (`apps/api/alembic/`) run automatically via `python -m app.cli migrate` on deploy (Alembic `upgrade head`). This applies schema changes (including legacy project table upgrades) without manual Shell commands.
+
+`seed` on start loads full curated data if the DB is empty; otherwise it **refreshes build projects** from `seed/data/projects/*.json`. Articles, quizzes, and topics are not wiped.
 
 Environment variables: `DATABASE_URL`, `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`. Render sets `PORT`.
 
@@ -134,7 +136,8 @@ Workflow: [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.
 apps/api/
 ├── app/
 │   ├── main.py           # FastAPI app
-│   ├── cli.py            # python -m app.cli push | seed | setup
+│   ├── cli.py            # python -m app.cli migrate | seed | setup
+│   ├── alembic/          # DB migrations (auto-run on deploy)
 │   ├── models.py         # SQLAlchemy schema (source of truth)
 │   ├── schemas.py        # Pydantic API models
 │   ├── routers/          # HTTP handlers
@@ -142,11 +145,22 @@ apps/api/
 │   ├── ai/               # LLM quiz + polish
 │   └── seed/
 │       ├── runner.py
-│       └── data/*.json   # Curated seed content
+│       └── data/         # Curated seed JSON (+ projects/*.json, 8 per language)
 ├── tests/
 ├── requirements.txt
 └── Makefile
 ```
+
+## Build project seed (Wave 1)
+
+- `apps/api/seed/data/projects/golang.json` — 8 Go projects
+- `apps/api/seed/data/projects/java.json` — 8 Java projects
+- `apps/api/seed/data/projects/kotlin.json` — 8 Kotlin projects
+- `apps/api/seed/data/projects/python.json` — 8 Python projects
+
+Regenerate JSON: `python3 apps/api/seed/generate_wave1_projects.py` and `python3 apps/api/seed/generate_wave1_jkp.py`.
+
+Schema: `python -m app.cli migrate`. Project content reloads on each API start via `seed` (or `reseed-projects` to force-drop project tables).
 
 ## Adding an API endpoint
 
