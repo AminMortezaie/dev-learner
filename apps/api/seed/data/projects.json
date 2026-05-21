@@ -1,0 +1,160 @@
+[
+  {
+    "languageSlug": "golang",
+    "slug": "worker-pool",
+    "title": "Worker Pool from Scratch",
+    "description": "Build a bounded worker pool in a single Go file: channels, goroutines, job dispatch, and graceful shutdown.",
+    "difficulty": "intermediate",
+    "codeLanguage": "go",
+    "playgroundUrl": "https://go.dev/play/",
+    "steps": [
+      {
+        "title": "Entry point and package",
+        "goal": "A valid Go program that compiles with an empty main.",
+        "instructions": "Every Go executable starts with `package main` and `func main()`. We will grow this file step by step into a worker pool.\n\nRun `go run .` in a folder with this file when you finish each step (locally or via Go Playground).",
+        "snippets": [
+          {
+            "path": "main.go",
+            "action": "create",
+            "label": "Bootstrap main",
+            "code": "package main\n\nfunc main() {\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Job type and channels",
+        "goal": "Define what a job looks like and allocate buffered channels for jobs and results.",
+        "instructions": "A worker pool moves **jobs** through a channel. Define a small `Job` struct and create:\n- `jobs` — work queue\n- `results` — completed work\n\nBuffered channels let producers send without blocking until the buffer fills.",
+        "snippets": [
+          {
+            "path": "main.go",
+            "action": "modify",
+            "label": "Add types and channels",
+            "code": "package main\n\nconst numWorkers = 3\n\ntype Job struct {\n\tID int\n}\n\ntype Result struct {\n\tJobID int\n\tOutput int\n}\n\nfunc main() {\n\tjobs := make(chan Job, 10)\n\tresults := make(chan Result, 10)\n\t_ = jobs\n\t_ = results\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Worker function",
+        "goal": "Implement `worker` that reads jobs until the channel closes.",
+        "instructions": "Each worker runs in its own goroutine and loops on `for job := range jobs`. When `jobs` is closed, the loop exits — that is how we signal shutdown later.\n\nFor this lesson, square the job ID as fake work.",
+        "snippets": [
+          {
+            "path": "main.go",
+            "action": "modify",
+            "label": "Add worker function",
+            "code": "package main\n\nimport \"fmt\"\n\nconst numWorkers = 3\n\ntype Job struct {\n\tID int\n}\n\ntype Result struct {\n\tJobID int\n\tOutput int\n}\n\nfunc worker(id int, jobs <-chan Job, results chan<- Result) {\n\tfor job := range jobs {\n\t\tfmt.Printf(\"worker %d processing job %d\\n\", id, job.ID)\n\t\tresults <- Result{JobID: job.ID, Output: job.ID * job.ID}\n\t}\n}\n\nfunc main() {\n\tjobs := make(chan Job, 10)\n\tresults := make(chan Result, 10)\n\t_ = jobs\n\t_ = results\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Start workers",
+        "goal": "Launch `numWorkers` goroutines before enqueueing jobs.",
+        "instructions": "Call `go worker(...)` in a loop. Pass `jobs` as receive-only (`<-chan`) and `results` as send-only (`chan<-`) to document intent.\n\nWorkers must start **before** you send jobs, otherwise nothing is listening yet.",
+        "snippets": [
+          {
+            "path": "main.go",
+            "action": "modify",
+            "label": "Start worker goroutines",
+            "code": "package main\n\nimport \"fmt\"\n\nconst numWorkers = 3\n\ntype Job struct {\n\tID int\n}\n\ntype Result struct {\n\tJobID int\n\tOutput int\n}\n\nfunc worker(id int, jobs <-chan Job, results chan<- Result) {\n\tfor job := range jobs {\n\t\tfmt.Printf(\"worker %d processing job %d\\n\", id, job.ID)\n\t\tresults <- Result{JobID: job.ID, Output: job.ID * job.ID}\n\t}\n}\n\nfunc main() {\n\tjobs := make(chan Job, 10)\n\tresults := make(chan Result, 10)\n\n\tfor w := 1; w <= numWorkers; w++ {\n\t\tgo worker(w, jobs, results)\n\t}\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Enqueue jobs and collect results",
+        "goal": "Send five jobs, close `jobs`, and read five results.",
+        "instructions": "After enqueueing, **close** the `jobs` channel so workers exit their `range` loops.\n\nUse a counted loop to read from `results`. Here we read exactly five results after sending five jobs.",
+        "snippets": [
+          {
+            "path": "main.go",
+            "action": "modify",
+            "label": "Dispatch jobs and print results",
+            "code": "package main\n\nimport \"fmt\"\n\nconst numWorkers = 3\n\ntype Job struct {\n\tID int\n}\n\ntype Result struct {\n\tJobID int\n\tOutput int\n}\n\nfunc worker(id int, jobs <-chan Job, results chan<- Result) {\n\tfor job := range jobs {\n\t\tfmt.Printf(\"worker %d processing job %d\\n\", id, job.ID)\n\t\tresults <- Result{JobID: job.ID, Output: job.ID * job.ID}\n\t}\n}\n\nfunc main() {\n\tjobs := make(chan Job, 10)\n\tresults := make(chan Result, 10)\n\n\tfor w := 1; w <= numWorkers; w++ {\n\t\tgo worker(w, jobs, results)\n\t}\n\n\tfor j := 1; j <= 5; j++ {\n\t\tjobs <- Job{ID: j}\n\t}\n\tclose(jobs)\n\n\tfor r := 1; r <= 5; r++ {\n\t\tres := <-results\n\t\tfmt.Printf(\"result job=%d output=%d\\n\", res.JobID, res.Output)\n\t}\n}\n"
+          }
+        ]
+      },
+      {
+        "title": "Wait for workers with sync.WaitGroup",
+        "goal": "Close `results` only after all workers finish — production-style shutdown.",
+        "instructions": "Real pools must not exit `main` while workers still run. Track workers with `sync.WaitGroup`:\n1. `wg.Add(1)` per worker, `defer wg.Done()` inside `worker`\n2. A goroutine waits on `wg.Wait()` then `close(results)`\n3. `main` ranges over `results` until closed",
+        "snippets": [
+          {
+            "path": "main.go",
+            "action": "modify",
+            "label": "Graceful shutdown with WaitGroup",
+            "code": "package main\n\nimport (\n\t\"fmt\"\n\t\"sync\"\n)\n\nconst numWorkers = 3\n\ntype Job struct {\n\tID int\n}\n\ntype Result struct {\n\tJobID int\n\tOutput int\n}\n\nfunc worker(id int, jobs <-chan Job, results chan<- Result, wg *sync.WaitGroup) {\n\tdefer wg.Done()\n\tfor job := range jobs {\n\t\tfmt.Printf(\"worker %d processing job %d\\n\", id, job.ID)\n\t\tresults <- Result{JobID: job.ID, Output: job.ID * job.ID}\n\t}\n}\n\nfunc main() {\n\tjobs := make(chan Job, 10)\n\tresults := make(chan Result, 10)\n\tvar wg sync.WaitGroup\n\n\tfor w := 1; w <= numWorkers; w++ {\n\t\twg.Add(1)\n\t\tgo worker(w, jobs, results, &wg)\n\t}\n\n\tgo func() {\n\t\twg.Wait()\n\t\tclose(results)\n\t}()\n\n\tfor j := 1; j <= 5; j++ {\n\t\tjobs <- Job{ID: j}\n\t}\n\tclose(jobs)\n\n\tfor res := range results {\n\t\tfmt.Printf(\"result job=%d output=%d\\n\", res.JobID, res.Output)\n\t}\n}\n"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "languageSlug": "python",
+    "slug": "async-fetcher",
+    "title": "Async URL Fetcher",
+    "description": "Build a minimal concurrent URL fetcher using asyncio — from a sync script to gathered tasks, then split across files.",
+    "difficulty": "intermediate",
+    "codeLanguage": "python",
+    "playgroundUrl": "https://www.online-python.com/",
+    "steps": [
+      {
+        "title": "Synchronous baseline",
+        "goal": "Fetch two URLs sequentially with httpx in a plain script.",
+        "instructions": "Start with the simplest version: a `main()` that calls a blocking `fetch` twice. This is the baseline we will make concurrent.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "create",
+            "label": "Blocking fetch script",
+            "code": "import httpx\n\nURLS = [\n    \"https://httpbin.org/get\",\n    \"https://httpbin.org/delay/1\",\n]\n\n\ndef fetch(client: httpx.Client, url: str) -> int:\n    response = client.get(url, timeout=10.0)\n    response.raise_for_status()\n    return response.status_code\n\n\ndef main() -> None:\n    with httpx.Client() as client:\n        for url in URLS:\n            status = fetch(client, url)\n            print(url, status)\n\n\nif __name__ == \"__main__\":\n    main()\n"
+          }
+        ]
+      },
+      {
+        "title": "Async fetch coroutine",
+        "goal": "Replace blocking calls with `async def` and `AsyncClient`.",
+        "instructions": "Convert `fetch` to a coroutine using `httpx.AsyncClient`. Drive the event loop with `asyncio.run(main())`.\n\nStill fetch URLs one after another — concurrency comes next.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "Async main and fetch",
+            "code": "import asyncio\nimport httpx\n\nURLS = [\n    \"https://httpbin.org/get\",\n    \"https://httpbin.org/delay/1\",\n]\n\n\nasync def fetch(client: httpx.AsyncClient, url: str) -> int:\n    response = await client.get(url, timeout=10.0)\n    response.raise_for_status()\n    return response.status_code\n\n\nasync def main() -> None:\n    async with httpx.AsyncClient() as client:\n        for url in URLS:\n            status = await fetch(client, url)\n            print(url, status)\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      },
+      {
+        "title": "Concurrent gather",
+        "goal": "Run all fetches concurrently with `asyncio.gather`.",
+        "instructions": "Build a list of coroutines and pass them to `asyncio.gather`. Total time should be close to the **slowest** URL, not the sum.",
+        "snippets": [
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "Gather all tasks",
+            "code": "import asyncio\nimport httpx\n\nURLS = [\n    \"https://httpbin.org/get\",\n    \"https://httpbin.org/delay/1\",\n]\n\n\nasync def fetch(client: httpx.AsyncClient, url: str) -> int:\n    response = await client.get(url, timeout=10.0)\n    response.raise_for_status()\n    return response.status_code\n\n\nasync def main() -> None:\n    async with httpx.AsyncClient() as client:\n        tasks = [fetch(client, url) for url in URLS]\n        statuses = await asyncio.gather(*tasks)\n        for url, status in zip(URLS, statuses):\n            print(url, status)\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      },
+      {
+        "title": "Split files and bound concurrency",
+        "goal": "Extract fetch logic to `fetcher.py` and cap in-flight requests from `main.py`.",
+        "instructions": "Larger apps split responsibilities across files. Move the fetch helper to **`fetcher.py`**, keep orchestration in **`main.py`**, and use `asyncio.Semaphore` in main to limit concurrency — the same idea as a worker pool.\n\nCreate both files in the same directory and run `python main.py`.",
+        "snippets": [
+          {
+            "path": "fetcher.py",
+            "action": "create",
+            "label": "New file — fetch helper",
+            "code": "import httpx\n\n\nasync def fetch(client: httpx.AsyncClient, url: str) -> int:\n    response = await client.get(url, timeout=10.0)\n    response.raise_for_status()\n    return response.status_code\n"
+          },
+          {
+            "path": "main.py",
+            "action": "modify",
+            "label": "Wire semaphore in main",
+            "code": "import asyncio\nimport httpx\n\nfrom fetcher import fetch\n\nURLS = [\n    \"https://httpbin.org/get\",\n    \"https://httpbin.org/delay/1\",\n    \"https://httpbin.org/delay/1\",\n    \"https://httpbin.org/get\",\n]\n\nMAX_CONCURRENT = 2\n\n\nasync def fetch_bounded(\n    client: httpx.AsyncClient, sem: asyncio.Semaphore, url: str\n) -> int:\n    async with sem:\n        print(\"fetching\", url)\n        return await fetch(client, url)\n\n\nasync def main() -> None:\n    sem = asyncio.Semaphore(MAX_CONCURRENT)\n    async with httpx.AsyncClient() as client:\n        tasks = [fetch_bounded(client, sem, url) for url in URLS]\n        statuses = await asyncio.gather(*tasks)\n        for url, status in zip(URLS, statuses):\n            print(url, status)\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())\n"
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -19,6 +19,16 @@ function resolveBackTarget(path: string): BackTarget | null {
     return { href: `/language/${syntaxMatch[1]}`, label: "Back to Language" };
   }
 
+  const projectStepMatch = normalized.match(/^\/projects\/([^/]+)\/([^/]+)$/);
+  if (projectStepMatch) {
+    return { href: `/projects/${projectStepMatch[1]}`, label: "Back to Projects" };
+  }
+
+  const projectsListMatch = normalized.match(/^\/projects\/([^/]+)$/);
+  if (projectsListMatch) {
+    return { href: `/language/${projectsListMatch[1]}`, label: "Back to Language" };
+  }
+
   const languageMatch = normalized.match(/^\/language\/([^/]+)$/);
   if (languageMatch) return { href: "/", label: "Back to Dashboard" };
 

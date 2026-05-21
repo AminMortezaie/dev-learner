@@ -17,6 +17,8 @@ import Quizzes from "@/pages/quizzes";
 import QuizView from "@/pages/quiz-view";
 import LanguageHub from "@/pages/language-hub";
 import SyntaxLessons from "@/pages/syntax-lessons";
+import ProjectsList from "@/pages/projects-list";
+import ProjectView from "@/pages/project-view";
 
 if (import.meta.env.PROD && import.meta.env.VITE_API_URL) {
   setBaseUrl(import.meta.env.VITE_API_URL as string);
@@ -39,6 +41,8 @@ function Router() {
         <Route path="/quizzes/:id" component={QuizView} />
         <Route path="/language/:slug" component={LanguageHub} />
         <Route path="/syntax/:languageSlug" component={SyntaxLessons} />
+        <Route path="/projects/:languageSlug" component={ProjectsList} />
+        <Route path="/projects/:languageSlug/:projectSlug" component={ProjectView} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

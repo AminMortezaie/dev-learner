@@ -2,7 +2,7 @@ import { useGetDashboardStats, useGetLanguageProgress, useGetRecentActivity, use
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { Layers, Library, BookOpen, BrainCircuit, Code2 } from "lucide-react";
+import { Layers, Library, BookOpen, BrainCircuit, Code2, Hammer } from "lucide-react";
 import { getLanguageColor, getLanguageIcon } from "@/shared/config/languages";
 
 export default function Dashboard() {
@@ -19,12 +19,13 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         <StatCard title="Topics" value={stats?.totalTopics} icon={Layers} loading={statsLoading} />
         <StatCard title="Resources" value={stats?.totalResources} icon={Library} loading={statsLoading} />
         <StatCard title="Articles" value={stats?.totalArticles} icon={BookOpen} loading={statsLoading} />
         <StatCard title="Quizzes" value={stats?.totalQuizzes} icon={BrainCircuit} loading={statsLoading} />
         <StatCard title="Syntax" value={stats?.totalSyntaxLessons} icon={Code2} loading={statsLoading} />
+        <StatCard title="Projects" value={stats?.totalProjects} icon={Hammer} loading={statsLoading} />
         <StatCard title="Languages" value={stats?.totalLanguages} icon={Layers} loading={statsLoading} />
       </div>
 
@@ -50,9 +51,10 @@ export default function Dashboard() {
                       <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
                         {lang.description}
                       </p>
-                      <div className="flex gap-4 text-xs text-muted-foreground font-mono">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground font-mono">
                         <span>{lang.topicCount || 0} topics</span>
                         <span>{lang.lessonCount || 0} syntax</span>
+                        <span>{lang.projectCount || 0} projects</span>
                       </div>
                     </CardContent>
                   </Card>

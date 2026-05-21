@@ -27,12 +27,14 @@ import type {
   Language,
   LanguageProgress,
   ListArticlesParams,
+  ListProjectsParams,
   ListQuizzesParams,
   ListResourcesParams,
   ListSyntaxLessonsParams,
   ListTopicsParams,
   PolishContentInput,
   PolishContentResult,
+  Project,
   Quiz,
   QuizAttemptInput,
   QuizAttemptResult,
@@ -1576,6 +1578,249 @@ export function useGetSyntaxLesson<TData = Awaited<ReturnType<typeof getSyntaxLe
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSyntaxLessonQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListProjectsUrl = (params?: ListProjectsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/projects?${stringifiedParams}` : `/api/projects`
+}
+
+/**
+ * @summary List build projects, optionally filtered by language
+ */
+export const listProjects = async (params?: ListProjectsParams, options?: RequestInit): Promise<Project[]> => {
+
+  return customFetch<Project[]>(getListProjectsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProjectsQueryKey = (params?: ListProjectsParams,) => {
+    return [
+    `/api/projects`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListProjectsQueryOptions = <TData = Awaited<ReturnType<typeof listProjects>>, TError = ErrorType<unknown>>(params?: ListProjectsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProjectsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjects>>> = ({ signal }) => listProjects(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof listProjects>>>
+export type ListProjectsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List build projects, optionally filtered by language
+ */
+
+export function useListProjects<TData = Awaited<ReturnType<typeof listProjects>>, TError = ErrorType<unknown>>(
+ params?: ListProjectsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProjectsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetProjectUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}`
+}
+
+/**
+ * @summary Get a project with all steps and code
+ */
+export const getProject = async (id: number, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getGetProjectUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectQueryKey = (id: number,) => {
+    return [
+    `/api/projects/${id}`
+    ] as const;
+    }
+
+
+export const getGetProjectQueryOptions = <TData = Awaited<ReturnType<typeof getProject>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProject>>> = ({ signal }) => getProject(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectQueryResult = NonNullable<Awaited<ReturnType<typeof getProject>>>
+export type GetProjectQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a project with all steps and code
+ */
+
+export function useGetProject<TData = Awaited<ReturnType<typeof getProject>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetProjectBySlugUrl = (languageSlug: string,
+    projectSlug: string,) => {
+
+
+
+
+  return `/api/projects/by-slug/${languageSlug}/${projectSlug}`
+}
+
+/**
+ * @summary Get a project by language and project slug
+ */
+export const getProjectBySlug = async (languageSlug: string,
+    projectSlug: string, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getGetProjectBySlugUrl(languageSlug,projectSlug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProjectBySlugQueryKey = (languageSlug: string,
+    projectSlug: string,) => {
+    return [
+    `/api/projects/by-slug/${languageSlug}/${projectSlug}`
+    ] as const;
+    }
+
+
+export const getGetProjectBySlugQueryOptions = <TData = Awaited<ReturnType<typeof getProjectBySlug>>, TError = ErrorType<void>>(languageSlug: string,
+    projectSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectBySlug>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectBySlugQueryKey(languageSlug,projectSlug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjectBySlug>>> = ({ signal }) => getProjectBySlug(languageSlug,projectSlug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(languageSlug && projectSlug), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProjectBySlug>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProjectBySlugQueryResult = NonNullable<Awaited<ReturnType<typeof getProjectBySlug>>>
+export type GetProjectBySlugQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a project by language and project slug
+ */
+
+export function useGetProjectBySlug<TData = Awaited<ReturnType<typeof getProjectBySlug>>, TError = ErrorType<void>>(
+ languageSlug: string,
+    projectSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProjectBySlug>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProjectBySlugQueryOptions(languageSlug,projectSlug,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

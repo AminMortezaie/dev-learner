@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
-from app.models import Article, Language, Quiz, Resource, SyntaxLesson, Topic
+from app.models import Article, Language, Project, Quiz, Resource, SyntaxLesson, Topic
 from app.schemas import ArticleOut, DashboardStats, LanguageProgress, RecentActivity, ResourceOut, QuizOut, iso
 
 
@@ -14,6 +14,7 @@ def get_dashboard_stats(db: Session) -> DashboardStats:
         total_articles=db.scalar(select(func.count()).select_from(Article)) or 0,
         total_quizzes=db.scalar(select(func.count()).select_from(Quiz)) or 0,
         total_syntax_lessons=db.scalar(select(func.count()).select_from(SyntaxLesson)) or 0,
+        total_projects=db.scalar(select(func.count()).select_from(Project)) or 0,
         total_languages=db.scalar(select(func.count()).select_from(Language)) or 0,
     )
 
@@ -86,6 +87,10 @@ def get_language_progress(db: Session) -> list[LanguageProgress]:
                     select(func.count())
                     .select_from(SyntaxLesson)
                     .where(SyntaxLesson.language_id == lang.id)
+                )
+                or 0,
+                project_count=db.scalar(
+                    select(func.count()).select_from(Project).where(Project.language_id == lang.id)
                 )
                 or 0,
                 quiz_count=db.scalar(

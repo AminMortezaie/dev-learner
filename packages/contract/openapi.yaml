@@ -21,6 +21,8 @@ tags:
     description: Quizzes and attempts
   - name: syntax
     description: Syntax lessons with real-world GitHub examples
+  - name: projects
+    description: Single-file build-from-scratch project walkthroughs
   - name: dashboard
     description: Dashboard summaries and stats
 
@@ -427,6 +429,78 @@ paths:
         "404":
           description: Not found
 
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List build projects, optionally filtered by language
+      parameters:
+        - name: languageId
+          in: query
+          schema:
+            type: integer
+        - name: difficulty
+          in: query
+          schema:
+            type: string
+            enum: [beginner, intermediate, advanced]
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project with all steps and code
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project with steps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+
+  /projects/by-slug/{languageSlug}/{projectSlug}:
+    get:
+      operationId: getProjectBySlug
+      tags: [projects]
+      summary: Get a project by language and project slug
+      parameters:
+        - name: languageSlug
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: projectSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project with steps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+
   /dashboard/stats:
     get:
       operationId: getDashboardStats
@@ -498,6 +572,8 @@ components:
         resourceCount:
           type: ["integer", "null"]
         lessonCount:
+          type: ["integer", "null"]
+        projectCount:
           type: ["integer", "null"]
 
     Topic:
@@ -734,6 +810,71 @@ components:
               explanation:
                 type: ["string", "null"]
 
+    ProjectSnippet:
+      type: object
+      required: [path, code]
+      properties:
+        path:
+          type: string
+        code:
+          type: string
+        action:
+          type: string
+          enum: [create, modify]
+        label:
+          type: ["string", "null"]
+
+    ProjectStep:
+      type: object
+      required: [id, projectId, orderIndex, title, goal, instructions, snippets]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        orderIndex:
+          type: integer
+        title:
+          type: string
+        goal:
+          type: string
+        instructions:
+          type: string
+        snippets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSnippet"
+
+    Project:
+      type: object
+      required: [id, languageId, slug, title, description, difficulty, codeLanguage]
+      properties:
+        id:
+          type: integer
+        languageId:
+          type: integer
+        languageName:
+          type: ["string", "null"]
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        codeLanguage:
+          type: string
+        playgroundUrl:
+          type: ["string", "null"]
+        stepCount:
+          type: ["integer", "null"]
+        steps:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/ProjectStep"
+
     SyntaxLesson:
       type: object
       required: [id, languageId, title, concept, difficulty]
@@ -768,7 +909,7 @@ components:
 
     DashboardStats:
       type: object
-      required: [totalTopics, totalResources, totalArticles, totalQuizzes, totalSyntaxLessons, totalLanguages]
+      required: [totalTopics, totalResources, totalArticles, totalQuizzes, totalSyntaxLessons, totalProjects, totalLanguages]
       properties:
         totalTopics:
           type: integer
@@ -779,6 +920,8 @@ components:
         totalQuizzes:
           type: integer
         totalSyntaxLessons:
+          type: integer
+        totalProjects:
           type: integer
         totalLanguages:
           type: integer
@@ -802,7 +945,7 @@ components:
 
     LanguageProgress:
       type: object
-      required: [languageId, languageName, topicCount, resourceCount, lessonCount, quizCount]
+      required: [languageId, languageName, topicCount, resourceCount, lessonCount, projectCount, quizCount]
       properties:
         languageId:
           type: integer
@@ -813,6 +956,8 @@ components:
         resourceCount:
           type: integer
         lessonCount:
+          type: integer
+        projectCount:
           type: integer
         quizCount:
           type: integer

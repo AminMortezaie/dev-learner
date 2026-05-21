@@ -22,6 +22,8 @@ export interface Language {
   resourceCount?: number | null;
   /** @nullable */
   lessonCount?: number | null;
+  /** @nullable */
+  projectCount?: number | null;
 }
 
 export type TopicDifficulty = typeof TopicDifficulty[keyof typeof TopicDifficulty];
@@ -219,6 +221,59 @@ export interface QuizAttemptResult {
   results?: QuizAttemptResultResultsItem[];
 }
 
+export type ProjectSnippetAction = typeof ProjectSnippetAction[keyof typeof ProjectSnippetAction];
+
+
+export const ProjectSnippetAction = {
+  create: 'create',
+  modify: 'modify',
+} as const;
+
+export interface ProjectSnippet {
+  path: string;
+  code: string;
+  action?: ProjectSnippetAction;
+  /** @nullable */
+  label?: string | null;
+}
+
+export interface ProjectStep {
+  id: number;
+  projectId: number;
+  orderIndex: number;
+  title: string;
+  goal: string;
+  instructions: string;
+  snippets: ProjectSnippet[];
+}
+
+export type ProjectDifficulty = typeof ProjectDifficulty[keyof typeof ProjectDifficulty];
+
+
+export const ProjectDifficulty = {
+  beginner: 'beginner',
+  intermediate: 'intermediate',
+  advanced: 'advanced',
+} as const;
+
+export interface Project {
+  id: number;
+  languageId: number;
+  /** @nullable */
+  languageName?: string | null;
+  slug: string;
+  title: string;
+  description: string;
+  difficulty: ProjectDifficulty;
+  codeLanguage: string;
+  /** @nullable */
+  playgroundUrl?: string | null;
+  /** @nullable */
+  stepCount?: number | null;
+  /** @nullable */
+  steps?: ProjectStep[] | null;
+}
+
 export type SyntaxLessonDifficulty = typeof SyntaxLessonDifficulty[keyof typeof SyntaxLessonDifficulty];
 
 
@@ -258,6 +313,7 @@ export interface DashboardStats {
   totalArticles: number;
   totalQuizzes: number;
   totalSyntaxLessons: number;
+  totalProjects: number;
   totalLanguages: number;
 }
 
@@ -273,6 +329,7 @@ export interface LanguageProgress {
   topicCount: number;
   resourceCount: number;
   lessonCount: number;
+  projectCount: number;
   quizCount: number;
 }
 
@@ -327,6 +384,20 @@ export type ListSyntaxLessonsDifficulty = typeof ListSyntaxLessonsDifficulty[key
 
 
 export const ListSyntaxLessonsDifficulty = {
+  beginner: 'beginner',
+  intermediate: 'intermediate',
+  advanced: 'advanced',
+} as const;
+
+export type ListProjectsParams = {
+languageId?: number;
+difficulty?: ListProjectsDifficulty;
+};
+
+export type ListProjectsDifficulty = typeof ListProjectsDifficulty[keyof typeof ListProjectsDifficulty];
+
+
+export const ListProjectsDifficulty = {
   beginner: 'beginner',
   intermediate: 'intermediate',
   advanced: 'advanced',

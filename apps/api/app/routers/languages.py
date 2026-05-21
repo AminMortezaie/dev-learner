@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Language, Resource, SyntaxLesson, Topic
+from app.models import Language, Project, Resource, SyntaxLesson, Topic
 from app.schemas import LanguageOut
 
 router = APIRouter(tags=["languages"])
@@ -25,6 +25,9 @@ def list_languages(db: Session = Depends(get_db)) -> list[LanguageOut]:
         lesson_count = db.scalar(
             select(func.count()).select_from(SyntaxLesson).where(SyntaxLesson.language_id == lang.id)
         ) or 0
+        project_count = db.scalar(
+            select(func.count()).select_from(Project).where(Project.language_id == lang.id)
+        ) or 0
         out.append(
             LanguageOut(
                 id=lang.id,
@@ -36,6 +39,7 @@ def list_languages(db: Session = Depends(get_db)) -> list[LanguageOut]:
                 topic_count=topic_count,
                 resource_count=resource_count,
                 lesson_count=lesson_count,
+                project_count=project_count,
             )
         )
     return out

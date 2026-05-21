@@ -5,8 +5,11 @@ from __future__ import annotations
 import argparse
 import sys
 
+from sqlalchemy import select, text
+
 from app.db import Base, _ensure_engine, get_engine
-from app.seed.runner import run_seed
+from app.models import Language, Project, ProjectStep
+from app.seed.runner import _seed_projects, run_seed
 
 
 def cmd_push() -> None:
@@ -21,6 +24,26 @@ def cmd_seed() -> None:
     db = factory()
     try:
         run_seed(db)
+    finally:
+        db.close()
+
+
+def cmd_reseed_projects() -> None:
+    """Drop and recreate project tables, then load curated projects from JSON."""
+    _ensure_engine()
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS project_steps CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS projects CASCADE"))
+    Project.__table__.create(engine, checkfirst=True)
+    ProjectStep.__table__.create(engine, checkfirst=True)
+    factory = _ensure_engine()
+    db = factory()
+    try:
+        langs = {lang.slug: lang for lang in db.scalars(select(Language)).all()}
+        _seed_projects(db, langs)
+        db.commit()
+        print("[cli] projects reseeded")
     finally:
         db.close()
 
@@ -41,6 +64,10 @@ def main(argv: list[str] | None = None) -> int:
         "setup",
         help="Run push then seed (use on deploy/build; seed only when DB is empty)",
     )
+    sub.add_parser(
+        "reseed-projects",
+        help="Drop project tables and reload build-project seed data",
+    )
 
     args = parser.parse_args(argv)
     if args.command == "push":
@@ -49,6 +76,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_seed()
     elif args.command == "setup":
         cmd_setup()
+    elif args.command == "reseed-projects":
+        cmd_reseed_projects()
     return 0
 
 

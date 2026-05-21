@@ -8,6 +8,7 @@ A developer learning platform for tracking progress across programming languages
 - **Articles** — Write articles in Markdown; polish raw text with AI
 - **AI Quiz Generation** — Auto-generates quizzes from articles
 - **Polish with AI** — Paste raw text; AI reformats it as clean Markdown
+- **Build Projects** — Zero-to-hero walkthroughs with per-step code snippets (single- or multi-file) and local progress
 - **Syntax Lessons** — Side-by-side code examples with syntax highlighting
 - **Resources** — Curated links to articles, videos, docs, and courses
 - **Mobile Responsive** — Full mobile support with hamburger nav drawer

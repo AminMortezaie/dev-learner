@@ -34,6 +34,7 @@ class LanguageOut(CamelModel):
     topic_count: Optional[int] = None
     resource_count: Optional[int] = None
     lesson_count: Optional[int] = None
+    project_count: Optional[int] = None
 
 
 class TopicOut(CamelModel):
@@ -155,6 +156,37 @@ class QuizAttemptOut(CamelModel):
     results: list[QuizResultItem]
 
 
+class ProjectSnippetOut(CamelModel):
+    path: str
+    code: str
+    action: Literal["create", "modify"] | None = None
+    label: str | None = None
+
+
+class ProjectStepOut(CamelModel):
+    id: int
+    project_id: int
+    order_index: int
+    title: str
+    goal: str
+    instructions: str
+    snippets: list[ProjectSnippetOut]
+
+
+class ProjectOut(CamelModel):
+    id: int
+    language_id: int
+    slug: str
+    title: str
+    description: str
+    difficulty: str
+    code_language: str
+    playground_url: str | None = None
+    language_name: str | None = None
+    step_count: int | None = None
+    steps: list[ProjectStepOut] | None = None
+
+
 class SyntaxLessonOut(CamelModel):
     id: int
     language_id: int
@@ -177,6 +209,7 @@ class DashboardStats(CamelModel):
     total_articles: int
     total_quizzes: int
     total_syntax_lessons: int
+    total_projects: int
     total_languages: int
 
 
@@ -192,6 +225,7 @@ class LanguageProgress(CamelModel):
     topic_count: int
     resource_count: int
     lesson_count: int
+    project_count: int
     quiz_count: int
 
 

@@ -86,6 +86,34 @@ class QuizQuestion(Base):
     quiz: Mapped["Quiz"] = relationship(back_populates="questions")
 
 
+class Project(Base):
+    __tablename__ = "projects"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    language_id: Mapped[int] = mapped_column(ForeignKey("languages.id"), nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    difficulty: Mapped[str] = mapped_column(Text, nullable=False)
+    code_language: Mapped[str] = mapped_column(Text, nullable=False)
+    playground_url: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    steps: Mapped[list["ProjectStep"]] = relationship(back_populates="project", order_by="ProjectStep.order_index")
+
+
+class ProjectStep(Base):
+    __tablename__ = "project_steps"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    order_index: Mapped[int] = mapped_column(nullable=False, default=0)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    goal: Mapped[str] = mapped_column(Text, nullable=False)
+    instructions: Mapped[str] = mapped_column(Text, nullable=False)
+    snippets: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    project: Mapped["Project"] = relationship(back_populates="steps")
+
+
 class SyntaxLesson(Base):
     __tablename__ = "syntax_lessons"
 

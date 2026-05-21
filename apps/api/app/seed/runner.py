@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models import (
     Article,
     Language,
+    Project,
+    ProjectStep,
     Quiz,
     QuizQuestion,
     Resource,
@@ -27,10 +29,47 @@ def _load(name: str) -> list | dict:
         return json.load(f)
 
 
+def _seed_projects(db: Session, lang_by_slug: dict[str, Language]) -> None:
+    db.execute(delete(ProjectStep))
+    db.execute(delete(Project))
+    db.flush()
+
+    projects_data = _load("projects.json")
+    print(f"[seed] inserting {len(projects_data)} projects")
+    for row in projects_data:
+        lang = lang_by_slug.get(row["languageSlug"])
+        if not lang:
+            raise ValueError(f"Unknown language slug: {row['languageSlug']}")
+        project = Project(
+            language_id=lang.id,
+            slug=row["slug"],
+            title=row["title"],
+            description=row["description"],
+            difficulty=row["difficulty"],
+            code_language=row["codeLanguage"],
+            playground_url=row.get("playgroundUrl"),
+        )
+        db.add(project)
+        db.flush()
+        for i, step in enumerate(row.get("steps") or []):
+            db.add(
+                ProjectStep(
+                    project_id=project.id,
+                    order_index=i,
+                    title=step["title"],
+                    goal=step["goal"],
+                    instructions=step["instructions"],
+                    snippets=step.get("snippets") or [],
+                )
+            )
+
+
 def run_seed(db: Session) -> None:
     existing = db.scalars(select(Language).limit(1)).first()
     if existing is not None:
-        print("[seed] data already exists, skipping")
+        lang_by_slug = {lang.slug: lang for lang in db.scalars(select(Language)).all()}
+        _seed_projects(db, lang_by_slug)
+        db.commit()
         return
 
     languages_data = _load("languages.json")
@@ -146,6 +185,8 @@ def run_seed(db: Session) -> None:
                 )
             )
             question_count += 1
+
+    _seed_projects(db, lang_by_slug)
 
     db.commit()
     print(f"[seed] inserted {quiz_count} quizzes with {question_count} questions")
