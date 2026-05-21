@@ -1,4 +1,4 @@
-import { useParams, useLocation, Link } from "wouter";
+import { useParams, useLocation } from "wouter";
 import {
   useGetArticle,
   useGetArticleQuiz,
@@ -8,7 +8,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, BrainCircuit, Calendar, Tag, Volume2, Pause, Square } from "lucide-react";
+import { BrainCircuit, Calendar, Tag, Volume2, Pause, Square } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { renderMarkdown } from "./markdown";
 import { useArticleTts } from "./use-article-tts";
@@ -94,12 +94,6 @@ export default function ArticleView() {
           </button>
         </div>
       )}
-      <Link href="/articles">
-        <Button variant="ghost" className="mb-6 -ml-4 font-mono text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Library
-        </Button>
-      </Link>
-
       <div className="space-y-4 mb-10 pb-10 border-b border-border">
         <div className="flex gap-2 items-center mb-4">
           {article.languageName && (

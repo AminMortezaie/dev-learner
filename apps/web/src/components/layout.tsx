@@ -4,6 +4,7 @@ import { LayoutDashboard, BookOpen, Layers, Library, BrainCircuit, Menu } from "
 import { useTheme } from "./theme-provider";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { PageBack } from "@/shared/components/page-back";
 
 function LogoMark({ size = 28 }: { size?: number }) {
   const s = size / 28;
@@ -110,6 +111,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 md:p-8 max-w-6xl mx-auto">
+            <PageBack />
             {children}
           </div>
         </main>

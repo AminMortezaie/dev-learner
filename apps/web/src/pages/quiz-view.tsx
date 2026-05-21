@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams } from "wouter";
 import {
   useGetQuiz,
   useSubmitQuizAttempt,
@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, XCircle, BrainCircuit, Lightbulb } from "lucide-react";
+import { CheckCircle2, XCircle, BrainCircuit, Lightbulb } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 export default function QuizView() {
@@ -96,12 +96,6 @@ export default function QuizView() {
   if (submitted && result) {
     return (
       <div className="max-w-2xl mx-auto animate-in fade-in duration-500">
-        <Link href="/quizzes">
-          <Button variant="ghost" className="mb-6 -ml-4 font-mono text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Quizzes
-          </Button>
-        </Link>
-        
         <Card className="mb-8 border-primary/20">
           <CardHeader className="text-center pb-4">
             <BrainCircuit className="h-12 w-12 mx-auto text-primary mb-4" />
@@ -188,12 +182,7 @@ export default function QuizView() {
 
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
-      <div className="flex justify-between items-center mb-6">
-        <Link href="/quizzes">
-          <Button variant="ghost" className="font-mono text-muted-foreground hover:text-foreground -ml-4">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Quit
-          </Button>
-        </Link>
+      <div className="flex justify-end items-center mb-6">
         <span className="font-mono text-sm text-muted-foreground">
           {currentQuestionIndex + 1} / {questions.length}
         </span>
