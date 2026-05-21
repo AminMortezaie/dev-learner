@@ -5,7 +5,7 @@ A developer learning platform for tracking progress across programming languages
 ## Features
 
 - **Learning Tracks** — Organized by language (Go, Python, Java, Kotlin, System Design)
-- **Articles** — Write or import from any URL; AI extracts and structures the content
+- **Articles** — Write articles in Markdown; polish raw text with AI
 - **AI Quiz Generation** — Auto-generates 10-question quizzes from articles
 - **Polish with AI** — Paste raw text, AI reformats it as clean Markdown
 - **Syntax Lessons** — Side-by-side code examples with syntax highlighting
@@ -73,9 +73,19 @@ pnpm install
 cp .env.example .env   # fill in your values
 
 # In separate terminals:
-pnpm --filter @workspace/api-server dev
-pnpm --filter @workspace/devlearn dev
+pnpm --filter @devlearn/api dev
+pnpm --filter @devlearn/web dev
 ```
+
+### API smoke tests
+
+Requires `DATABASE_URL` (same as the API server):
+
+```bash
+pnpm --filter @devlearn/api test
+```
+
+Without a database, tests are skipped automatically.
 
 ## Environment Variables
 
@@ -98,38 +108,63 @@ pnpm --filter @workspace/devlearn dev
 
 ```
 .
-├── artifacts/
-│   ├── api-server/        # Express API (TypeScript)
+├── apps/
+│   ├── api/                  # Express API (deployable)
 │   │   └── src/
-│   │       ├── lib/       # AI, error handling, helpers
-│   │       ├── routes/    # REST endpoints
-│   │       └── seed/      # Database seed data
-│   └── devlearn/          # React frontend
+│   │       ├── routes/       # Thin HTTP handlers
+│   │       ├── services/     # Business logic
+│   │       ├── lib/          # AI, errors, helpers
+│   │       └── seed/         # Database seed data
+│   └── web/                  # React frontend (deployable)
 │       └── src/
-│           ├── components/
-│           └── pages/
-├── lib/
-│   ├── api-client-react/  # Generated API client + hooks
-│   ├── api-spec/          # OpenAPI spec
-│   ├── api-zod/           # Zod schemas
-│   └── db/                # Drizzle schema + migrations
+│           ├── pages/        # Route entrypoints
+│           └── components/   # Layout + shadcn UI
+├── packages/
+│   ├── contract/             # OpenAPI spec + codegen (source of truth)
+│   ├── api-zod/              # Generated Zod validators (server)
+│   ├── api-client/           # Generated React Query hooks (client)
+│   └── database/             # Drizzle schema + migrations
+├── scripts/                  # Repo tooling (PWA icons, etc.)
 ├── docker-compose.yml
 └── .env.example
 ```
+
+## API contract and codegen
+
+The API contract lives in [`packages/contract/openapi.yaml`](packages/contract/openapi.yaml). After editing it:
+
+```bash
+pnpm --filter @devlearn/contract run codegen
+```
+
+This regenerates:
+
+- [`packages/api-zod`](packages/api-zod) — request/response validation for the API server
+- [`packages/api-client`](packages/api-client) — hooks and types for the frontend
+
+### Adding an endpoint
+
+1. Add the path and schemas to `packages/contract/openapi.yaml`
+2. Run `pnpm --filter @devlearn/contract run codegen`
+3. Implement a thin route in `apps/api/src/routes/` that validates with `@devlearn/api-zod` and delegates to `services/`
+4. Use the generated hook in `apps/web/src/features/` or `pages/`
+5. Add a smoke test in `apps/api/src/app.test.ts` when practical
 
 ## API Endpoints
 
 | Method | Path | Description |
 |---|---|---|
+| `GET` | `/api/healthz` | Health check |
 | `GET` | `/api/articles` | List articles |
 | `POST` | `/api/articles` | Create article (auto-generates quiz) |
-| `POST` | `/api/articles/from-url` | Import article from URL |
 | `POST` | `/api/articles/polish` | Polish raw text with AI |
 | `GET` | `/api/quizzes/:id` | Get quiz with questions |
 | `POST` | `/api/quizzes/:id/attempt` | Submit quiz answers |
 | `GET` | `/api/languages` | List language tracks |
 | `GET` | `/api/syntax` | List syntax lessons |
 | `GET` | `/api/dashboard/stats` | Dashboard statistics |
+
+> **Note:** URL-based article import (`POST /api/articles/from-url`) is not implemented yet.
 
 ## License
 

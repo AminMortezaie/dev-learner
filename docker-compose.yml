@@ -34,14 +34,13 @@ services:
     volumes:
       - ./:/workspace
       - devlearn-node-modules:/workspace/node_modules
-      - devlearn-api-nm:/workspace/artifacts/api-server/node_modules
-      - devlearn-web-nm:/workspace/artifacts/devlearn/node_modules
-      - devlearn-mockup-nm:/workspace/artifacts/mockup-sandbox/node_modules
+      - devlearn-api-nm:/workspace/apps/api/node_modules
+      - devlearn-web-nm:/workspace/apps/web/node_modules
       - devlearn-scripts-nm:/workspace/scripts/node_modules
-      - devlearn-lib-apizod-nm:/workspace/lib/api-zod/node_modules
-      - devlearn-lib-db-nm:/workspace/lib/db/node_modules
-      - devlearn-lib-apiclient-nm:/workspace/lib/api-client-react/node_modules
-      - devlearn-lib-apispec-nm:/workspace/lib/api-spec/node_modules
+      - devlearn-lib-apizod-nm:/workspace/packages/api-zod/node_modules
+      - devlearn-lib-db-nm:/workspace/packages/database/node_modules
+      - devlearn-lib-apiclient-nm:/workspace/packages/api-client/node_modules
+      - devlearn-lib-apispec-nm:/workspace/packages/contract/node_modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,9 +52,9 @@ services:
       start_period: 120s
     command: >
       sh -c "pnpm install --frozen-lockfile=false &&
-             pnpm --filter @workspace/db run push &&
-             pnpm --filter @workspace/api-server run seed &&
-             pnpm --filter @workspace/api-server dev"
+             pnpm --filter @devlearn/database run push &&
+             pnpm --filter @devlearn/api run seed &&
+             pnpm --filter @devlearn/api dev"
 
   devlearn:
     build:
@@ -75,26 +74,24 @@ services:
     volumes:
       - ./:/workspace
       - devlearn-node-modules:/workspace/node_modules
-      - devlearn-api-nm:/workspace/artifacts/api-server/node_modules
-      - devlearn-web-nm:/workspace/artifacts/devlearn/node_modules
-      - devlearn-mockup-nm:/workspace/artifacts/mockup-sandbox/node_modules
+      - devlearn-api-nm:/workspace/apps/api/node_modules
+      - devlearn-web-nm:/workspace/apps/web/node_modules
       - devlearn-scripts-nm:/workspace/scripts/node_modules
-      - devlearn-lib-apizod-nm:/workspace/lib/api-zod/node_modules
-      - devlearn-lib-db-nm:/workspace/lib/db/node_modules
-      - devlearn-lib-apiclient-nm:/workspace/lib/api-client-react/node_modules
-      - devlearn-lib-apispec-nm:/workspace/lib/api-spec/node_modules
+      - devlearn-lib-apizod-nm:/workspace/packages/api-zod/node_modules
+      - devlearn-lib-db-nm:/workspace/packages/database/node_modules
+      - devlearn-lib-apiclient-nm:/workspace/packages/api-client/node_modules
+      - devlearn-lib-apispec-nm:/workspace/packages/contract/node_modules
     depends_on:
       api-server:
         condition: service_healthy
     command: >
-      sh -c "pnpm --filter @workspace/devlearn dev"
+      sh -c "pnpm --filter @devlearn/web dev"
 
 volumes:
   devlearn-pgdata:
   devlearn-node-modules:
   devlearn-api-nm:
   devlearn-web-nm:
-  devlearn-mockup-nm:
   devlearn-scripts-nm:
   devlearn-lib-apizod-nm:
   devlearn-lib-db-nm:

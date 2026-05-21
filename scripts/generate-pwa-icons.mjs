@@ -118,7 +118,7 @@ function makePNG(size) {
   return Buffer.concat([sig, ihdr, idat, iend]);
 }
 
-const publicDir = resolve(__dirname, "../artifacts/devlearn/public");
+const publicDir = resolve(__dirname, "../apps/web/public");
 writeFileSync(resolve(publicDir, "pwa-192x192.png"), makePNG(192));
 writeFileSync(resolve(publicDir, "pwa-512x512.png"), makePNG(512));
 console.log("PWA icons generated.");

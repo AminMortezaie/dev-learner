@@ -12,7 +12,7 @@ out-tsc
 node_modules
 
 # IDEs and editors
-/.idea
+.idea/
 .project
 .classpath
 .c9/
@@ -20,7 +20,7 @@ node_modules
 .settings/
 *.sublime-workspace
 
-# IDE - VSCode
+# IDE - VSCode / Cursor (optional shared settings)
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -44,14 +44,18 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
-# Replit
+# Local tooling caches (not part of the repo)
 .cache/
+.claude/
 .local/
+.pnpm-store/
 .junie
+
+# Legacy paths (removed after apps/packages rename)
+artifacts/
+lib/
 
 # Environment variables (never commit real secrets)
 .env
 .env.local
 .env.*.local
-/.claude/
-/.pnpm-store/

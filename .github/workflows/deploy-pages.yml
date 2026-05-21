@@ -41,13 +41,13 @@ jobs:
           BASE_PATH: /dev-learner/
           PORT: "5174"
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: pnpm --filter @workspace/devlearn build
+        run: pnpm --filter @devlearn/web build
 
       - uses: actions/configure-pages@v4
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: artifacts/devlearn/dist/public
+          path: apps/web/dist/public
 
       - uses: actions/deploy-pages@v4
         id: deployment
