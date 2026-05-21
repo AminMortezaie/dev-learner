@@ -55,6 +55,12 @@ Thumbs.db
 artifacts/
 lib/
 
+# Python API
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
 # Environment variables (never commit real secrets)
 .env
 .env.local

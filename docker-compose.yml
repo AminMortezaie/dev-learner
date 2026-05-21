@@ -17,30 +17,21 @@ services:
       timeout: 3s
       retries: 20
 
-  api-server:
+  api:
     build:
       context: .
       dockerfile: Dockerfile.dev
     platform: linux/amd64
     container_name: devlearn-api
     restart: unless-stopped
-    working_dir: /workspace
+    working_dir: /workspace/apps/api
     environment:
       PORT: "5051"
       DATABASE_URL: "postgres://devlearn:devlearn@postgres:5432/devlearn"
-      CI: "true"
     ports:
       - "5051:5051"
     volumes:
-      - ./:/workspace
-      - devlearn-node-modules:/workspace/node_modules
-      - devlearn-api-nm:/workspace/apps/api/node_modules
-      - devlearn-web-nm:/workspace/apps/web/node_modules
-      - devlearn-scripts-nm:/workspace/scripts/node_modules
-      - devlearn-lib-apizod-nm:/workspace/packages/api-zod/node_modules
-      - devlearn-lib-db-nm:/workspace/packages/database/node_modules
-      - devlearn-lib-apiclient-nm:/workspace/packages/api-client/node_modules
-      - devlearn-lib-apispec-nm:/workspace/packages/contract/node_modules
+      - ./apps/api:/workspace/apps/api
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,12 +42,12 @@ services:
       retries: 30
       start_period: 120s
     command: >
-      sh -c "pnpm install --frozen-lockfile=false &&
-             pnpm --filter @devlearn/database run push &&
-             pnpm --filter @devlearn/api run seed &&
-             pnpm --filter @devlearn/api dev"
+      sh -c "python3 -m venv /opt/api-venv &&
+             /opt/api-venv/bin/pip install -q -r requirements.txt &&
+             /opt/api-venv/bin/python -m app.cli setup &&
+             /opt/api-venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 5051"
 
-  devlearn:
+  web:
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -67,33 +58,26 @@ services:
     environment:
       PORT: "5174"
       BASE_PATH: "/"
-      API_PROXY_TARGET: "http://api-server:5051"
+      API_PROXY_TARGET: "http://api:5051"
       CI: "true"
     ports:
       - "5174:5174"
     volumes:
       - ./:/workspace
       - devlearn-node-modules:/workspace/node_modules
-      - devlearn-api-nm:/workspace/apps/api/node_modules
       - devlearn-web-nm:/workspace/apps/web/node_modules
-      - devlearn-scripts-nm:/workspace/scripts/node_modules
-      - devlearn-lib-apizod-nm:/workspace/packages/api-zod/node_modules
-      - devlearn-lib-db-nm:/workspace/packages/database/node_modules
       - devlearn-lib-apiclient-nm:/workspace/packages/api-client/node_modules
-      - devlearn-lib-apispec-nm:/workspace/packages/contract/node_modules
+      - devlearn-lib-contract-nm:/workspace/packages/contract/node_modules
     depends_on:
-      api-server:
+      api:
         condition: service_healthy
     command: >
-      sh -c "pnpm --filter @devlearn/web dev"
+      sh -c "pnpm install --frozen-lockfile=false &&
+             pnpm --filter @devlearn/web dev"
 
 volumes:
   devlearn-pgdata:
   devlearn-node-modules:
-  devlearn-api-nm:
   devlearn-web-nm:
-  devlearn-scripts-nm:
-  devlearn-lib-apizod-nm:
-  devlearn-lib-db-nm:
   devlearn-lib-apiclient-nm:
-  devlearn-lib-apispec-nm:
+  devlearn-lib-contract-nm:

@@ -4,13 +4,7 @@
   "files": [],
   "references": [
     {
-      "path": "./packages/database"
-    },
-    {
       "path": "./packages/api-client"
-    },
-    {
-      "path": "./packages/api-zod"
     }
   ]
 }
