@@ -112,7 +112,7 @@ DATABASE_URL=postgres://devlearn:devlearn@localhost:5432/devlearn make test
 
 ### Render (API) — Python only
 
-Set **Root Directory** to `apps/api` and link your Render Postgres database so `DATABASE_URL` is available at build and runtime.
+Link your Render Postgres database so `DATABASE_URL` is available at build and runtime. Set **Root Directory** to `apps/api`.
 
 | Setting | Command |
 |---|---|
@@ -122,16 +122,6 @@ Set **Root Directory** to `apps/api` and link your Render Postgres database so `
 `setup` runs `push` (create tables) then `seed` (load curated data **only if the database is empty**). `seed` on start is a fast no-op when data already exists, so restarts stay safe.
 
 Environment variables: `DATABASE_URL`, `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`. Render sets `PORT`.
-
-If the service root must stay at the repo root:
-
-```bash
-# Build
-pip install -r apps/api/requirements.txt && cd apps/api && python -m app.cli setup
-
-# Start
-cd apps/api && python -m app.cli seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
 
 ### GitHub Pages (frontend)
 
