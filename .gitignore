@@ -54,6 +54,9 @@ Thumbs.db
 # Legacy paths (removed after apps/packages rename)
 artifacts/
 lib/
+scripts/seed/
+apps/api/src/
+.replit-artifact/
 
 # Python API
 __pycache__/
