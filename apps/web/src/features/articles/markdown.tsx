@@ -1,21 +1,7 @@
 import React from "react";
 import { CodeBlock } from "@/components/code-block";
-
-function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|(?<!\*)\*(?!\*)[^*]+(?<!\*)\*(?!\*)|`[^`]+`)/);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith("*") && part.endsWith("*") && part.length > 2 && !part.startsWith("**")) {
-      return <em key={i}>{part.slice(1, -1)}</em>;
-    }
-    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
-      return <code key={i}>{part.slice(1, -1)}</code>;
-    }
-    return part;
-  });
-}
+import { renderInline } from "./markdown-inline";
+import { MarkdownTable } from "./markdown-table";
 
 function isBulletLine(line: string): boolean {
   const t = line.trimStart();
@@ -48,35 +34,6 @@ function isTableSeparatorRow(line: string): boolean {
 
 function isTableRow(line: string): boolean {
   return parseTableCells(line).length >= 2;
-}
-
-function renderTable(header: string[], rows: string[][]): React.ReactNode {
-  return (
-    <div className="my-4 overflow-x-auto rounded-lg border border-border">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-border bg-muted/50">
-            {header.map((cell, j) => (
-              <th key={j} className="px-3 py-2 text-left font-semibold text-foreground">
-                {renderInline(cell)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri} className="border-b border-border/50 last:border-0">
-              {row.map((cell, ci) => (
-                <td key={ci} className="px-3 py-2 align-top text-muted-foreground">
-                  {renderInline(cell)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 export function renderMarkdown(content: string): React.ReactNode[] {
@@ -131,7 +88,11 @@ export function renderMarkdown(content: string): React.ReactNode[] {
     }
     if (line.startsWith("## ")) {
       flushPara();
-      elements.push(<h2 key={key("h")}>{renderInline(line.slice(3))}</h2>);
+      elements.push(
+        <h2 key={key("h")} className="text-center">
+          {renderInline(line.slice(3))}
+        </h2>,
+      );
       i++;
       continue;
     }
@@ -187,16 +148,12 @@ export function renderMarkdown(content: string): React.ReactNode[] {
       if (tableLines.length >= 2 && isTableSeparatorRow(tableLines[1]!)) {
         const header = parseTableCells(tableLines[0]!);
         const body = tableLines.slice(2).map(parseTableCells);
-        elements.push(
-          <div key={key("table")}>{renderTable(header, body)}</div>,
-        );
+        elements.push(<MarkdownTable key={key("table")} header={header} rows={body} />);
       } else {
         const rows = tableLines.map(parseTableCells);
         const header = rows[0] ?? [];
         const body = rows.slice(1);
-        elements.push(
-          <div key={key("table")}>{renderTable(header, body)}</div>,
-        );
+        elements.push(<MarkdownTable key={key("table")} header={header} rows={body} />);
       }
       continue;
     }
