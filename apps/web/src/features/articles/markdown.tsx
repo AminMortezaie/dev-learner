@@ -30,6 +30,55 @@ function stripBullet(line: string): string {
   return line.trimStart().replace(/^[-*] /, "").replace(/^\d+\. /, "");
 }
 
+/** Split a pipe table row into cells (GFM-style). */
+function parseTableCells(line: string): string[] {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|")) return [];
+  let inner = trimmed;
+  if (inner.startsWith("|")) inner = inner.slice(1);
+  if (inner.endsWith("|")) inner = inner.slice(0, -1);
+  return inner.split("|").map((c) => c.trim());
+}
+
+function isTableSeparatorRow(line: string): boolean {
+  const cells = parseTableCells(line);
+  if (cells.length < 2) return false;
+  return cells.every((c) => /^:?-{3,}:?$/.test(c.replace(/\s/g, "")));
+}
+
+function isTableRow(line: string): boolean {
+  return parseTableCells(line).length >= 2;
+}
+
+function renderTable(header: string[], rows: string[][]): React.ReactNode {
+  return (
+    <div className="my-4 overflow-x-auto rounded-lg border border-border">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-border bg-muted/50">
+            {header.map((cell, j) => (
+              <th key={j} className="px-3 py-2 text-left font-semibold text-foreground">
+                {renderInline(cell)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri} className="border-b border-border/50 last:border-0">
+              {row.map((cell, ci) => (
+                <td key={ci} className="px-3 py-2 align-top text-muted-foreground">
+                  {renderInline(cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function renderMarkdown(content: string): React.ReactNode[] {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
@@ -125,6 +174,30 @@ export function renderMarkdown(content: string): React.ReactNode[] {
           ))}
         </blockquote>,
       );
+      continue;
+    }
+
+    if (isTableRow(line)) {
+      flushPara();
+      const tableLines: string[] = [];
+      while (i < lines.length && isTableRow(lines[i]!)) {
+        tableLines.push(lines[i]!);
+        i++;
+      }
+      if (tableLines.length >= 2 && isTableSeparatorRow(tableLines[1]!)) {
+        const header = parseTableCells(tableLines[0]!);
+        const body = tableLines.slice(2).map(parseTableCells);
+        elements.push(
+          <div key={key("table")}>{renderTable(header, body)}</div>,
+        );
+      } else {
+        const rows = tableLines.map(parseTableCells);
+        const header = rows[0] ?? [];
+        const body = rows.slice(1);
+        elements.push(
+          <div key={key("table")}>{renderTable(header, body)}</div>,
+        );
+      }
       continue;
     }
 
