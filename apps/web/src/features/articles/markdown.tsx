@@ -36,6 +36,65 @@ function isTableRow(line: string): boolean {
   return parseTableCells(line).length >= 2;
 }
 
+function isSingleHashComment(line: string): boolean {
+  const t = line.trimStart();
+  return /^#(?!\#)\s/.test(t);
+}
+
+function isUnfencedCodeLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed === "") return false;
+  if (/^#{2,6}\s/.test(trimmed)) return false;
+  if (trimmed.startsWith("```")) return false;
+  if (trimmed.startsWith("> ")) return false;
+  if (isTableRow(line)) return false;
+  if (isBulletLine(line)) return false;
+  if (isOrderedLine(line)) return false;
+  if (isSingleHashComment(line)) return true;
+  if (/^\s{4,}\S/.test(line)) return true;
+  if (
+    /^(import |from \S+ import |def |class |if __name__|print\(|return\b|for\b|while\b|elif\b|else:|try:|except\b|with\b|async def )/.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  if (/^[a-zA-Z_]\w*\s*=/.test(trimmed)) return true;
+  if (/^[a-zA-Z_]\w*\(\)/.test(trimmed)) return true;
+  return false;
+}
+
+function consumeUnfencedCodeBlock(lines: string[], startIndex: number): { codeLines: string[]; nextIndex: number } {
+  const codeLines: string[] = [];
+  let i = startIndex;
+
+  while (i < lines.length) {
+    const line = lines[i]!;
+    const trimmed = line.trim();
+
+    if (trimmed === "") {
+      let j = i + 1;
+      while (j < lines.length && lines[j]!.trim() === "") j++;
+      if (j < lines.length && isUnfencedCodeLine(lines[j]!)) {
+        codeLines.push(line);
+        i++;
+        continue;
+      }
+      break;
+    }
+
+    if (!isUnfencedCodeLine(line)) break;
+    codeLines.push(line);
+    i++;
+  }
+
+  while (codeLines.length > 0 && codeLines[codeLines.length - 1]!.trim() === "") {
+    codeLines.pop();
+  }
+
+  return { codeLines, nextIndex: i };
+}
+
 export function renderMarkdown(content: string): React.ReactNode[] {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
@@ -92,11 +151,13 @@ export function renderMarkdown(content: string): React.ReactNode[] {
       i++;
       continue;
     }
-    if (line.startsWith("# ")) {
-      flushPara();
-      elements.push(<h1 key={key("h")}>{renderInline(line.slice(2))}</h1>);
-      i++;
-      continue;
+    if (line.startsWith("# ") && !line.startsWith("## ")) {
+      if (elements.length === 0 && paraLines.length === 0) {
+        flushPara();
+        elements.push(<h1 key={key("h")}>{renderInline(line.slice(2))}</h1>);
+        i++;
+        continue;
+      }
     }
 
     if (trimmed.startsWith("```")) {
@@ -114,6 +175,20 @@ export function renderMarkdown(content: string): React.ReactNode[] {
           <CodeBlock code={codeLines.join("\n")} language={lang} />
         </div>,
       );
+      continue;
+    }
+
+    if (isUnfencedCodeLine(line)) {
+      flushPara();
+      const { codeLines, nextIndex } = consumeUnfencedCodeBlock(lines, i);
+      if (codeLines.length > 0) {
+        elements.push(
+          <div key={key("code")} className="rounded-lg overflow-hidden border border-border my-4">
+            <CodeBlock code={codeLines.join("\n")} language="python" />
+          </div>,
+        );
+      }
+      i = nextIndex;
       continue;
     }
 
