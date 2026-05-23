@@ -88,11 +88,7 @@ export function renderMarkdown(content: string): React.ReactNode[] {
     }
     if (line.startsWith("## ")) {
       flushPara();
-      elements.push(
-        <h2 key={key("h")} className="text-center">
-          {renderInline(line.slice(3))}
-        </h2>,
-      );
+      elements.push(<h2 key={key("h")}>{renderInline(line.slice(3))}</h2>);
       i++;
       continue;
     }
