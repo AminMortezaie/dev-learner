@@ -139,7 +139,9 @@ def generate_quiz_from_article(
     cfg = _ai_config()
     if cfg:
         try:
-            ai_questions = _unique(_generate_quiz_with_ai(title, content, language, n, cfg))
+            ai_questions = _unique(
+                _generate_quiz_with_ai(title, content, language, n, cfg, exclude=seen)
+            )
             if len(ai_questions) >= n:
                 return ai_questions[:n]
             extra = _generate_heuristic(title, content, n - len(ai_questions), exclude=seen)
@@ -155,9 +157,13 @@ def _generate_quiz_with_ai(
     language: str | None,
     count: int,
     cfg: dict[str, str],
+    exclude: set[str] | None = None,
 ) -> list[GeneratedQuestion]:
     lang_hint = f" Topic: {language}." if language else ""
-    system = "Output only valid JSON. Create deep multiple-choice questions, not trivia."
+    system = (
+        "Output only valid JSON. Every question must be directly answerable from the article text. "
+        "Do not invent facts. The correct option must be unambiguously supported by the article."
+    )
     snippet = _normalize_for_ai(content, settings.ai_quiz_article_chars)
     user = (
         f"Generate {count} MCQs from the article.{lang_hint} "
@@ -166,6 +172,9 @@ def _generate_quiz_with_ai(
         f'"correctAnswer":number,"explanation":string}}]}}\n'
         f"=== {title} ===\n{snippet}"
     )
+    if exclude:
+        existing = [q[:120] for q in list(exclude)[:12]]
+        user += "\n\nDo not repeat or closely rephrase these existing questions:\n- " + "\n- ".join(existing)
     raw = _ai_chat(
         cfg,
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -201,8 +210,10 @@ def _validate_questions(value: Any, expected: int) -> list[GeneratedQuestion]:
     return out
 
 
+
 def _strip_markdown_noise(text: str) -> str:
     text = re.sub(r"```[\s\S]*?```", " ", text)
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.M)
     return re.sub(r"`([^`]+)`", r"\1", text)
 
 
@@ -219,47 +230,44 @@ def _dedupe_preserve(items: list[str]) -> list[str]:
 
 
 def _split_sentences(text: str) -> list[str]:
-    plain = _strip_markdown_noise(text)
+    body = re.sub(r"^#{1,6}\s+.+$", "", text, flags=re.M)
+    plain = _strip_markdown_noise(body)
     sentences: list[str] = []
     for s in re.split(r"(?<=[.!?])\s+", plain):
         s = re.sub(r"\s+", " ", s).strip()
-        if 15 < len(s) < 400:
+        if 20 < len(s) < 320:
             sentences.append(s)
     for m in re.finditer(r"^[-*]\s+(.+)$", text, re.M):
         item = re.sub(r"\s+", " ", m.group(1)).strip()
-        if 15 < len(item) < 400:
+        if 20 < len(item) < 320:
             sentences.append(item)
     return _dedupe_preserve(sentences)
 
 
 def _extract_headings(text: str) -> list[str]:
     headings = [m.group(1).strip() for m in re.finditer(r"^#{1,3}\s+(.+)$", text, re.M)]
-    return _dedupe_preserve([h for h in headings if 3 < len(h) < 120])
+    return _dedupe_preserve([h for h in headings if 4 < len(h) < 100])
 
 
 def _extract_bullets(text: str) -> list[str]:
     bullets = [m.group(1).strip() for m in re.finditer(r"^[-*]\s+(.+)$", text, re.M)]
-    return _dedupe_preserve([b for b in bullets if 10 < len(b) < 300])
+    return _dedupe_preserve([b for b in bullets if 15 < len(b) < 280])
 
 
-def _extract_code_blocks(text: str) -> list[tuple[str | None, str]]:
-    blocks: list[tuple[str | None, str]] = []
-    for m in re.finditer(r"```(\w+)?\n([\s\S]*?)```", text):
-        lang = m.group(1)
-        code = m.group(2).strip()
-        if len(code) > 10:
-            blocks.append((lang, code))
-    return blocks
+def _extract_backtick_terms(text: str) -> list[str]:
+    return _dedupe_preserve(t.strip() for t in re.findall(r"`([^`\n]+)`", text) if 2 < len(t.strip()) < 40)
 
 
-def _extract_key_terms(text: str, limit: int = 64) -> list[str]:
+def _extract_key_terms(text: str, limit: int = 40) -> list[str]:
     stop = {
         "the", "and", "for", "with", "that", "this", "from", "into", "your", "you", "are", "was",
         "but", "not", "have", "has", "can", "will", "would", "could", "should", "may", "might",
         "their", "there", "these", "those", "when", "where", "what", "which", "why", "how", "its",
         "also", "more", "most", "such", "than", "then", "they", "them", "were", "been", "about",
         "using", "used", "use", "like", "just", "only", "other", "some", "each", "make", "made",
+        "article", "example", "function", "method", "class", "return", "value", "type", "types",
     }
+    terms = list(_extract_backtick_terms(text))
     plain = _strip_markdown_noise(text)
     freq: dict[str, int] = {}
     for m in re.finditer(r"[A-Za-z][A-Za-z0-9_-]{3,}", plain):
@@ -267,36 +275,34 @@ def _extract_key_terms(text: str, limit: int = 64) -> list[str]:
         if t.lower() in stop:
             continue
         freq[t] = freq.get(t, 0) + 1
-    return [k for k, _ in sorted(freq.items(), key=lambda x: (-x[1], x[0]))[:limit]]
-
-
-def _generic_distractors(seed: int) -> list[str]:
-    pool = [
-        "An unrelated framework comparison",
-        "A historical retrospective of programming languages",
-        "A bug report unrelated to the article",
-        "A deployment checklist not covered in the text",
-        "A language syntax reference from another ecosystem",
-        "A performance benchmark the article does not discuss",
-    ]
-    return _shuffle_stable(pool, seed)[:3]
-
-
-def _other_sentence_distractors(sentences: list[str], correct_idx: int, seed: int) -> list[str]:
-    distractors: list[str] = []
-    for offset in range(1, len(sentences) + 1):
-        idx = (correct_idx + offset) % len(sentences)
-        if idx == correct_idx:
-            continue
-        snippet = sentences[idx][:140]
-        if snippet and snippet not in distractors:
-            distractors.append(snippet)
-        if len(distractors) >= 3:
+    ranked = [k for k, _ in sorted(freq.items(), key=lambda x: (-x[1], x[0]))]
+    for term in ranked:
+        if term not in terms:
+            terms.append(term)
+        if len(terms) >= limit:
             break
-    while len(distractors) < 3:
-        distractors.extend(_generic_distractors(seed + len(distractors)))
-        distractors = _dedupe_preserve(distractors)
-    return distractors[:3]
+    return terms
+
+
+def _is_strong_term(term: str, *, backtick_terms: set[str], heading_terms: set[str]) -> bool:
+    if term in backtick_terms:
+        return True
+    if len(term) < 5 or term.lower() in _TERM_STOP:
+        return False
+    if term.lower() in heading_terms and term not in backtick_terms:
+        return False
+    if re.search(r"[A-Z]", term[1:]) or "_" in term or re.search(r"\d", term):
+        return True
+    return len(term) >= 8
+
+
+_TERM_STOP = {
+    "about", "after", "also", "article", "because", "before", "between", "channel",
+    "channels", "class", "concurrency", "content", "could", "data", "example", "first",
+    "from", "function", "into", "lightweight", "method", "operations", "other", "return",
+    "safely", "second", "should", "statement", "statements", "their", "there", "these",
+    "those", "through", "under", "using", "value", "which", "while", "would", "write",
+}
 
 
 def _shuffle_stable(arr: list[str], seed: int) -> list[str]:
@@ -305,6 +311,22 @@ def _shuffle_stable(arr: list[str], seed: int) -> list[str]:
         j = (seed * 9301 + 49297 + i) % (i + 1)
         out[i], out[j] = out[j], out[i]
     return out
+
+
+def _valid_distractors(correct: str, candidates: list[str]) -> list[str] | None:
+    correct_norm = correct.strip().lower()
+    out: list[str] = []
+    seen: set[str] = {correct_norm}
+    for item in candidates:
+        value = item.strip()
+        key = value.lower()
+        if not value or key in seen:
+            continue
+        seen.add(key)
+        out.append(value)
+        if len(out) == 3:
+            return out
+    return None
 
 
 def _make_mcq(
@@ -317,9 +339,10 @@ def _make_mcq(
     correct = correct.strip()
     if not question.strip() or not correct:
         return None
-    options = _shuffle_stable([correct, *distractors[:3]], seed)
-    if correct not in options:
+    valid = _valid_distractors(correct, distractors)
+    if not valid:
         return None
+    options = _shuffle_stable([correct, *valid], seed)
     return GeneratedQuestion(
         question=question.strip(),
         options=options,
@@ -328,241 +351,161 @@ def _make_mcq(
     )
 
 
-def _heuristic_subject_question(title: str, content: str) -> GeneratedQuestion | None:
-    parts = re.split(r"(?<=[.!?])\s+", _strip_markdown_noise(content))
-    first = parts[0].strip() if parts else ""
-    summary = first[:160] if len(first) > 20 else f"An overview of {title}"
-    return _make_mcq(
-        f'What is the primary subject of "{title}"?',
-        summary,
-        _generic_distractors(0),
-        "The article's title and opening sentences establish its primary subject.",
-        0,
-    )
+def _term_context(content: str) -> tuple[set[str], set[str]]:
+    backtick_terms = set(_extract_backtick_terms(content))
+    heading_terms: set[str] = set()
+    for heading in _extract_headings(content):
+        for word in re.findall(r"[A-Za-z][A-Za-z0-9_-]+", heading):
+            heading_terms.add(word.lower())
+    return backtick_terms, heading_terms
+
+
+def _heuristic_term_sentence_questions(
+    sentences: list[str],
+    key_terms: list[str],
+    *,
+    backtick_terms: set[str],
+    heading_terms: set[str],
+) -> list[GeneratedQuestion]:
+    out: list[GeneratedQuestion] = []
+    for i, term in enumerate(key_terms):
+        if not _is_strong_term(term, backtick_terms=backtick_terms, heading_terms=heading_terms):
+            continue
+        matching = [s for s in sentences if re.search(rf"\b{re.escape(term)}\b", s, re.I)]
+        non_matching = [s for s in sentences if not re.search(rf"\b{re.escape(term)}\b", s, re.I)]
+        if not matching or len(non_matching) < 3:
+            continue
+        correct = matching[0][:200]
+        distractors = [s[:200] for s in non_matching[:6]]
+        q = _make_mcq(
+            f'Which sentence from the article mentions "{term}"?',
+            correct,
+            distractors,
+            f'"{term}" appears in: "{matching[0][:220]}"',
+            i,
+        )
+        if q:
+            out.append(q)
+    return out
 
 
 def _heuristic_fill_blank_questions(
     sentences: list[str],
     key_terms: list[str],
+    *,
+    backtick_terms: set[str],
+    heading_terms: set[str],
 ) -> list[GeneratedQuestion]:
     out: list[GeneratedQuestion] = []
+    used_pairs: set[tuple[str, str]] = set()
     for i, sentence in enumerate(sentences):
         for term in key_terms:
-            if term.lower() not in sentence.lower():
+            if not _is_strong_term(term, backtick_terms=backtick_terms, heading_terms=heading_terms):
                 continue
-            masked = re.sub(re.escape(term), "____", sentence, count=1, flags=re.I)
-            if masked == sentence:
+            if not re.search(rf"\b{re.escape(term)}\b", sentence, re.I):
                 continue
-            distractors = [t for t in key_terms if t.lower() != term.lower()][:3]
-            while len(distractors) < 3:
-                distractors.extend(_generic_distractors(i + len(distractors)))
-                distractors = _dedupe_preserve(distractors)
+            pair = (sentence.lower(), term.lower())
+            if pair in used_pairs:
+                continue
+            masked = re.sub(rf"\b{re.escape(term)}\b", "____", sentence, count=1, flags=re.I)
+            if masked == sentence or "____" not in masked:
+                continue
+            used_pairs.add(pair)
+            other_terms = [
+                t for t in key_terms
+                if t.lower() != term.lower()
+                and _is_strong_term(t, backtick_terms=backtick_terms, heading_terms=heading_terms)
+            ]
+            distractors = [t for t in other_terms if t.lower() not in sentence.lower()]
             q = _make_mcq(
                 f"Fill in the blank: {masked[:220]}",
                 term,
                 distractors,
-                f'The article states: "{sentence.strip()[:200]}"',
-                i + len(out),
+                f'The article states: "{sentence[:220]}"',
+                i + len(out) + 17,
             )
             if q:
                 out.append(q)
     return out
 
 
-def _heuristic_statement_questions(sentences: list[str]) -> list[GeneratedQuestion]:
-    out: list[GeneratedQuestion] = []
-    for i, sentence in enumerate(sentences):
-        correct = sentence[:140]
-        q = _make_mcq(
-            "According to the article, which statement is most accurate?",
-            correct,
-            _other_sentence_distractors(sentences, i, i) if len(sentences) > 1 else _generic_distractors(i),
-            f"Taken from the article: \"{sentence.strip()[:200]}\"",
-            i + 11,
-        )
-        if q:
-            out.append(q)
-    return out
-
-
-def _heuristic_heading_questions(headings: list[str], key_terms: list[str]) -> list[GeneratedQuestion]:
+def _heuristic_heading_questions(headings: list[str]) -> list[GeneratedQuestion]:
+    if len(headings) < 4:
+        return []
     out: list[GeneratedQuestion] = []
     for i, heading in enumerate(headings):
-        distractors = [h for h in headings if h != heading][:3]
-        if len(distractors) < 3:
-            distractors.extend(t for t in key_terms if t.lower() != heading.lower())
-        distractors = _dedupe_preserve(distractors)[:3]
-        while len(distractors) < 3:
-            distractors.extend(_generic_distractors(i + len(distractors)))
-            distractors = _dedupe_preserve(distractors)
+        distractors = [h for h in headings if h != heading]
         q = _make_mcq(
-            "Which section heading appears in this article?",
+            "Which of the following is a section heading in this article?",
             heading,
-            distractors[:3],
-            f"The article includes a section titled \"{heading}\".",
-            i + 23,
+            distractors,
+            f'The article contains the heading "{heading}".',
+            i + 31,
         )
         if q:
             out.append(q)
     return out
 
 
-def _heuristic_bullet_questions(bullets: list[str], sentences: list[str]) -> list[GeneratedQuestion]:
+def _heuristic_bullet_blank_questions(
+    bullets: list[str],
+    key_terms: list[str],
+    *,
+    backtick_terms: set[str],
+    heading_terms: set[str],
+) -> list[GeneratedQuestion]:
     out: list[GeneratedQuestion] = []
     for i, bullet in enumerate(bullets):
-        correct = bullet[:140]
-        pool = [b[:140] for j, b in enumerate(bullets) if j != i]
-        pool.extend(s[:140] for s in sentences if s[:140] != correct)
-        distractors = _dedupe_preserve(pool)[:3]
-        while len(distractors) < 3:
-            distractors.extend(_generic_distractors(i + len(distractors)))
-            distractors = _dedupe_preserve(distractors)
-        q = _make_mcq(
-            "Which point is made in the article?",
-            correct,
-            distractors[:3],
-            f"The article lists: \"{bullet.strip()[:200]}\"",
-            i + 37,
+        local_terms = [t for t in key_terms if re.search(rf"\b{re.escape(t)}\b", bullet, re.I)]
+        term = next(
+            (t for t in local_terms if _is_strong_term(t, backtick_terms=backtick_terms, heading_terms=heading_terms)),
+            None,
         )
-        if q:
-            out.append(q)
-    return out
-
-
-def _heuristic_code_questions(code_blocks: list[tuple[str | None, str]]) -> list[GeneratedQuestion]:
-    out: list[GeneratedQuestion] = []
-    for i, (lang, code) in enumerate(code_blocks):
-        preview = "\n".join(code.splitlines()[:4]).strip()
-        if lang:
-            correct = f"A {lang} code example from the article"
-            distractors = [
-                "A shell script not shown in the article",
-                "A SQL migration unrelated to the content",
-                "A configuration file the article does not include",
-            ]
-            explanation = f"The article includes a {lang} code block."
-        else:
-            correct = preview[:120] if preview else "A code example from the article"
-            distractors = _generic_distractors(i)
-            explanation = "The article includes a code example matching this snippet."
-        q = _make_mcq(
-            "Which code-related content appears in the article?",
-            correct,
-            distractors,
-            explanation,
-            i + 51,
-        )
-        if q:
-            out.append(q)
-    return out
-
-
-def _heuristic_term_context_questions(sentences: list[str], key_terms: list[str]) -> list[GeneratedQuestion]:
-    out: list[GeneratedQuestion] = []
-    for i, term in enumerate(key_terms):
-        matches = [s for s in sentences if term.lower() in s.lower()]
-        if not matches:
+        if not term:
             continue
-        sentence = matches[i % len(matches)]
-        correct = sentence[:140]
-        distractors = _other_sentence_distractors(sentences, sentences.index(sentence), i)
-        q = _make_mcq(
-            f'In what context does the article mention "{term}"?',
-            correct,
-            distractors,
-            f"\"{term}\" appears in: \"{sentence.strip()[:200]}\"",
-            i + 67,
-        )
-        if q:
-            out.append(q)
-    return out
-
-
-def _heuristic_negative_term_questions(key_terms: list[str], content: str) -> list[GeneratedQuestion]:
-    out: list[GeneratedQuestion] = []
-    content_lower = content.lower()
-    absent = [t for t in key_terms if t.lower() not in content_lower]
-    present = [t for t in key_terms if t.lower() in content_lower]
-    if not present:
-        return out
-    fake_terms = ["Kubernetes", "GraphQL", "Terraform", "Redis", "Elasticsearch", "Docker Swarm"]
-    for i, fake in enumerate(fake_terms):
-        if fake.lower() in content_lower:
+        masked = re.sub(rf"\b{re.escape(term)}\b", "____", bullet, count=1, flags=re.I)
+        if "____" not in masked:
             continue
-        distractors = _shuffle_stable(present[:4], i)[:3]
-        while len(distractors) < 3:
-            distractors.append(present[len(distractors) % len(present)])
+        distractors = [
+            t for t in key_terms
+            if t.lower() != term.lower() and not re.search(rf"\b{re.escape(t)}\b", bullet, re.I)
+        ]
         q = _make_mcq(
-            "Which term is NOT discussed in the article?",
-            fake,
-            distractors[:3],
-            f"\"{fake}\" does not appear as a topic in this article.",
-            i + 79,
-        )
-        if q:
-            out.append(q)
-        if len(out) >= max(4, len(absent)):
-            break
-    return out
-
-
-def _heuristic_variation_questions(
-    title: str,
-    sentences: list[str],
-    key_terms: list[str],
-    start_index: int,
-    needed: int,
-) -> list[GeneratedQuestion]:
-    templates = [
-        ("Which option best reflects a claim made in \"{title}\"?", lambda s: s[:140]),
-        ("The article implies that:", lambda s: s[:140]),
-        ("Which idea is supported by the article?", lambda s: s[:140]),
-        ("Which summary matches the article's discussion of {term}?", lambda s: s[:140]),
-    ]
-    out: list[GeneratedQuestion] = []
-    idx = start_index
-    while len(out) < needed:
-        if not sentences and not key_terms:
-            break
-        template, formatter = templates[idx % len(templates)]
-        sentence = sentences[idx % len(sentences)] if sentences else title
-        term = key_terms[idx % len(key_terms)] if key_terms else title
-        question = template.format(title=title, term=term)
-        correct = formatter(sentence)
-        distractors = _other_sentence_distractors(sentences, idx % max(1, len(sentences)), idx) if len(sentences) > 1 else _generic_distractors(idx)
-        q = _make_mcq(
-            question,
-            correct,
+            f"Fill in the blank in this bullet point: {masked[:220]}",
+            term,
             distractors,
-            f"Variation based on article content near item {idx + 1}.",
-            idx + 101,
+            f'The bullet point reads: "{bullet[:220]}"',
+            i + 47,
         )
         if q:
             out.append(q)
-        idx += 1
-        if idx > start_index + needed * 4:
-            break
     return out
 
 
-def _collect_heuristic_candidates(title: str, content: str) -> list[GeneratedQuestion]:
+def _collect_heuristic_candidates(_title: str, content: str) -> list[GeneratedQuestion]:
     sentences = _split_sentences(content)
     key_terms = _extract_key_terms(content)
     headings = _extract_headings(content)
     bullets = _extract_bullets(content)
-    code_blocks = _extract_code_blocks(content)
+    backtick_terms, heading_terms = _term_context(content)
 
     candidates: list[GeneratedQuestion] = []
-    subject = _heuristic_subject_question(title, content)
-    if subject:
-        candidates.append(subject)
-    candidates.extend(_heuristic_fill_blank_questions(sentences, key_terms))
-    candidates.extend(_heuristic_statement_questions(sentences))
-    candidates.extend(_heuristic_heading_questions(headings, key_terms))
-    candidates.extend(_heuristic_bullet_questions(bullets, sentences))
-    candidates.extend(_heuristic_code_questions(code_blocks))
-    candidates.extend(_heuristic_term_context_questions(sentences, key_terms))
-    candidates.extend(_heuristic_negative_term_questions(key_terms, content))
+    candidates.extend(
+        _heuristic_term_sentence_questions(
+            sentences, key_terms, backtick_terms=backtick_terms, heading_terms=heading_terms
+        )
+    )
+    candidates.extend(
+        _heuristic_fill_blank_questions(
+            sentences, key_terms, backtick_terms=backtick_terms, heading_terms=heading_terms
+        )
+    )
+    candidates.extend(_heuristic_heading_questions(headings))
+    candidates.extend(
+        _heuristic_bullet_blank_questions(
+            bullets, key_terms, backtick_terms=backtick_terms, heading_terms=heading_terms
+        )
+    )
     return candidates
 
 
@@ -577,21 +520,6 @@ def _generate_heuristic(
     out: list[GeneratedQuestion] = []
 
     for q in _collect_heuristic_candidates(title, content):
-        if q.question in seen:
-            continue
-        seen.add(q.question)
-        out.append(q)
-        if len(out) >= count:
-            return out[:count]
-
-    variations = _heuristic_variation_questions(
-        title,
-        _split_sentences(content),
-        _extract_key_terms(content),
-        len(out),
-        count - len(out),
-    )
-    for q in variations:
         if q.question in seen:
             continue
         seen.add(q.question)

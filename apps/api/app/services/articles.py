@@ -226,7 +226,15 @@ def expand_article_quiz(db: Session, article_id: int, additional_count: int) -> 
         exclude={q.question for q in existing},
     )
     if not new_questions:
-        raise ValueError("Could not generate additional unique questions from this article")
+        raise ValueError(
+            "Could not generate more unique questions from this article. "
+            "The article may not have enough distinct content left, or the AI quota was exceeded."
+        )
+
+    added = len(new_questions)
+    if added < to_add:
+        # Partial success is acceptable; only verifiable questions are added.
+        pass
 
     start_index = len(existing)
     for offset, q in enumerate(new_questions):

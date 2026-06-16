@@ -79,14 +79,26 @@ export default function ArticleView() {
       { id: articleId, data: { additionalCount: count } },
       {
         onSuccess: (data) => {
+          const newTotal = data.questionCount ?? data.questions?.length ?? 0;
+          const actuallyAdded = newTotal - currentQuestionCount;
           queryClient.setQueryData(getGetArticleQuizQueryKey(articleId), data);
           toast({
-            title: `Added ${count} question${count === 1 ? "" : "s"}`,
-            description: `This quiz now has ${data.questionCount ?? data.questions?.length ?? 0} questions.`,
+            title:
+              actuallyAdded < count
+                ? `Added ${actuallyAdded} of ${count} requested`
+                : `Added ${actuallyAdded} question${actuallyAdded === 1 ? "" : "s"}`,
+            description:
+              actuallyAdded < count
+                ? `Only ${actuallyAdded} new verifiable question${actuallyAdded === 1 ? "" : "s"} could be generated. Quiz now has ${newTotal}.`
+                : `This quiz now has ${newTotal} questions.`,
           });
         },
-        onError: () => {
-          toast({ title: "Failed to add questions", variant: "destructive" });
+        onError: (error: Error) => {
+          toast({
+            title: "Failed to add questions",
+            description: error.message || "Try a smaller batch or add more content to the article.",
+            variant: "destructive",
+          });
         },
       },
     );
