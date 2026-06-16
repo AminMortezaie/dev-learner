@@ -23,11 +23,11 @@ class GeneratedQuestion:
 
 
 def _ai_config() -> dict[str, str] | None:
-    api_key = settings.ai_api_key or os.getenv("OPENAI_API_KEY", "")
+    api_key = settings.resolved_ai_api_key
     if not api_key:
         return None
-    base_url = (settings.ai_base_url or "https://api.openai.com/v1").rstrip("/")
-    model = settings.ai_model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    base_url = (settings.ai_base_url or "https://api.cerebras.ai/v1").rstrip("/")
+    model = settings.ai_model or os.getenv("AI_MODEL", "gpt-oss-120b")
     return {"api_key": api_key, "base_url": base_url, "model": model}
 
 

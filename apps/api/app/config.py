@@ -8,15 +8,15 @@ class Settings(BaseSettings):
 
     database_url: str = ""
     port: int = 5000
-    ai_base_url: str = "https://api.openai.com/v1"
+    ai_base_url: str = "https://api.cerebras.ai/v1"
     ai_api_key: str = ""
-    ai_model: str = "gpt-4o-mini"
+    ai_model: str = "gpt-oss-120b"
 
     @property
-    def openai_api_key(self) -> str:
+    def resolved_ai_api_key(self) -> str:
         import os
 
-        return self.ai_api_key or os.getenv("OPENAI_API_KEY", "")
+        return self.ai_api_key or os.getenv("CEREBRAS_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
 
 
 settings = Settings()

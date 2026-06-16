@@ -21,7 +21,7 @@ A developer learning platform for tracking progress across programming languages
 | Backend | **Python 3.12+**, FastAPI, SQLAlchemy, Uvicorn |
 | Database | PostgreSQL 16 |
 | API contract | OpenAPI 3 + Orval (React Query client for the web only) |
-| AI | Groq / OpenAI-compatible API |
+| AI | Cerebras / OpenAI-compatible API |
 | Dev | Docker Compose; pnpm for frontend + client codegen only |
 
 The backend is **Python-only** — no Node.js, Express, Drizzle, or `package.json` under `apps/api`.
@@ -42,7 +42,7 @@ The backend is **Python-only** — no Node.js, Express, Drizzle, or `package.jso
 
 - [Docker](https://www.docker.com/) and Docker Compose, **or**
 - Python 3.12+, PostgreSQL 16, and [pnpm](https://pnpm.io/) (frontend only)
-- A free [Groq API key](https://console.groq.com/) (optional, for AI features)
+- A free [Cerebras API key](https://cloud.cerebras.ai/) (optional, for AI features)
 
 ### Environment
 
@@ -52,9 +52,9 @@ cp .env.example .env
 
 ```env
 DATABASE_URL=postgres://devlearn:devlearn@localhost:5432/devlearn
-AI_BASE_URL=https://api.groq.com/openai/v1
-AI_API_KEY=your_groq_key_here
-AI_MODEL=llama-3.3-70b-versatile
+AI_BASE_URL=https://api.cerebras.ai/v1
+AI_API_KEY=your_cerebras_key_here
+AI_MODEL=gpt-oss-120b
 ```
 
 ### Docker (recommended)
