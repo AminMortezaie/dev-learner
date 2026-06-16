@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     ai_quiz_article_chars: int = 3000
     ai_quiz_default_count: int = 5
     ai_quiz_max_output_tokens: int = 2048
-    ai_polish_chunk_chars: int = 10000
-    ai_polish_max_output_tokens: int = 2048
+    ai_polish_chunk_chars: int = 6000
+    ai_polish_max_output_tokens: int = 4096
 
     @property
     def resolved_ai_api_key(self) -> str:

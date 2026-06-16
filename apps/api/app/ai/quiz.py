@@ -31,8 +31,9 @@ def _quiz_output_tokens(count: int) -> int:
 
 
 def _polish_output_tokens(chunk_len: int) -> int:
-    estimated = chunk_len // 2 + 256
-    return min(max(estimated, 512), settings.ai_polish_max_output_tokens)
+    # Polished output is roughly the same length as input (~4 chars per token).
+    estimated = (chunk_len * 3) // 4 + 512
+    return min(max(estimated, 1024), settings.ai_polish_max_output_tokens)
 
 
 @dataclass
@@ -58,6 +59,16 @@ def _ai_chat(
     max_tokens: int = 512,
     json_mode: bool = True,
 ) -> str:
+    content, _finish = _ai_chat_with_meta(cfg, messages, max_tokens, json_mode)
+    return content
+
+
+def _ai_chat_with_meta(
+    cfg: dict[str, str],
+    messages: list[dict[str, str]],
+    max_tokens: int = 512,
+    json_mode: bool = True,
+) -> tuple[str, str]:
     body: dict[str, Any] = {
         "model": cfg["model"],
         "temperature": 0.3,
@@ -67,7 +78,7 @@ def _ai_chat(
     if json_mode:
         body["response_format"] = {"type": "json_object"}
 
-    with httpx.Client(timeout=30.0) as client:
+    with httpx.Client(timeout=60.0) as client:
         res = client.post(
             f"{cfg['base_url']}/chat/completions",
             headers={
@@ -79,10 +90,97 @@ def _ai_chat(
     if res.status_code >= 400:
         raise RuntimeError(f"AI HTTP {res.status_code}: {res.text[:300]}")
     data = res.json()
-    content = data.get("choices", [{}])[0].get("message", {}).get("content")
+    choice = data.get("choices", [{}])[0]
+    content = choice.get("message", {}).get("content")
     if not content:
         raise RuntimeError("AI returned no content")
-    return content
+    finish_reason = str(choice.get("finish_reason", ""))
+    return content, finish_reason
+
+
+def _split_polish_chunks(text: str, max_chars: int) -> list[str]:
+    if len(text) <= max_chars:
+        return [text]
+
+    chunks: list[str] = []
+    current = ""
+    for paragraph in re.split(r"\n\n+", text):
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+        candidate = f"{current}\n\n{paragraph}" if current else paragraph
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+            current = ""
+        if len(paragraph) <= max_chars:
+            current = paragraph
+            continue
+        # Very long paragraph (e.g. pasted blob): split on sentence boundaries.
+        start = 0
+        while start < len(paragraph):
+            end = min(start + max_chars, len(paragraph))
+            if end < len(paragraph):
+                split_at = paragraph.rfind(". ", start, end)
+                if split_at > start + max_chars // 3:
+                    end = split_at + 1
+            piece = paragraph[start:end].strip()
+            if piece:
+                chunks.append(piece)
+            start = end
+    if current:
+        chunks.append(current)
+    return chunks or [text]
+
+
+def _polish_chunk(
+    cfg: dict[str, str],
+    chunk: str,
+    *,
+    part_label: str | None,
+    max_tokens: int,
+) -> str:
+    system = (
+        "You are a lossless Markdown formatter. Your only job is to restructure the input. "
+        "CRITICAL RULES:\n"
+        "1. Preserve EVERY sentence, bullet, code block, link, and fact from the input.\n"
+        "2. Do NOT summarize, shorten, omit, paraphrase away, or invent content.\n"
+        "3. Only add Markdown structure: headings, lists, fenced code blocks, bold.\n"
+        "4. Output raw Markdown only — no JSON, no commentary, no wrapper fences around the whole text.\n"
+        "5. The output must contain substantially the same text as the input (similar length)."
+    )
+    user = f"{part_label}\n\n{chunk}" if part_label else chunk
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+    result, finish = _ai_chat_with_meta(cfg, messages, max_tokens, json_mode=False)
+    result = result.strip()
+
+    input_len = len(chunk.strip())
+    output_len = len(result)
+    truncated = finish == "length"
+    too_short = input_len > 200 and output_len < int(input_len * 0.75)
+
+    if truncated or too_short:
+        retry_tokens = min(max_tokens * 2, settings.ai_polish_max_output_tokens)
+        if retry_tokens > max_tokens:
+            result, finish = _ai_chat_with_meta(cfg, messages, retry_tokens, json_mode=False)
+            result = result.strip()
+            truncated = finish == "length"
+            too_short = input_len > 200 and len(result) < int(input_len * 0.75)
+
+    if truncated:
+        raise RuntimeError(
+            "AI polish was truncated (output token limit). "
+            "Try shorter content or raise AI_POLISH_MAX_OUTPUT_TOKENS."
+        )
+    if too_short:
+        raise RuntimeError(
+            "AI polish removed too much content. "
+            "The model shortened the text instead of only reformatting it."
+        )
+    return result
 
 
 def polish_content(raw_text: str) -> str:
@@ -90,30 +188,20 @@ def polish_content(raw_text: str) -> str:
     if not cfg:
         raise RuntimeError("AI_API_KEY is required for content polishing")
 
-    system = (
-        "Reformat raw text as clean Markdown only. "
-        "Do not add, remove, or summarize content — only restructure with headings, lists, "
-        "code blocks, and bold. No commentary or wrapping fences."
-    )
-
     chunk_size = settings.ai_polish_chunk_chars
-    chunks = [raw_text[i : i + chunk_size] for i in range(0, len(raw_text), chunk_size)]
+    chunks = _split_polish_chunks(raw_text, chunk_size)
     polished: list[str] = []
     for idx, chunk in enumerate(chunks):
-        user = (
-            f"Part {idx + 1}/{len(chunks)}:\n\n{chunk}"
-            if len(chunks) > 1
-            else chunk
-        )
-        result = _ai_chat(
+        part_label = f"Part {idx + 1}/{len(chunks)} (preserve all text in this part):" if len(chunks) > 1 else None
+        result = _polish_chunk(
             cfg,
-            [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            chunk,
+            part_label=part_label,
             max_tokens=_polish_output_tokens(len(chunk)),
-            json_mode=False,
         )
-        polished.append(result.strip())
+        polished.append(result)
 
-    return "\n\n".join(s for s in polished if s)
+    return "\n\n".join(polished)
 
 
 def generate_quiz_from_article(
