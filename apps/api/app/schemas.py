@@ -98,7 +98,7 @@ class ArticleIn(CamelModel):
     summary: str | None = None
     language_id: int | None = None
     tags: str | None = None
-    quiz_count: int | None = Field(default=None, ge=1, le=20)
+    quiz_count: int | None = Field(default=None, ge=1, le=50)
 
 
 class PolishIn(CamelModel):
@@ -107,6 +107,10 @@ class PolishIn(CamelModel):
 
 class PolishOut(CamelModel):
     content: str
+
+
+class ExpandArticleQuizIn(CamelModel):
+    additional_count: int = Field(default=5, ge=1, le=20)
 
 
 class QuizQuestionOut(CamelModel):

@@ -148,9 +148,9 @@ export interface ArticleInput {
   languageId?: number | null;
   tags?: string;
   /**
-     * Number of quiz questions to auto-generate (default 10)
+     * Number of quiz questions to auto-generate (default 5)
      * @minimum 1
-     * @maximum 20
+     * @maximum 50
      */
   quizCount?: number;
 }
@@ -162,6 +162,15 @@ export interface PolishContentInput {
 
 export interface PolishContentResult {
   content: string;
+}
+
+export interface ExpandArticleQuizInput {
+  /**
+     * Number of new questions to add (max 50 total per quiz)
+     * @minimum 1
+     * @maximum 20
+     */
+  additionalCount?: number;
 }
 
 export interface QuizQuestion {

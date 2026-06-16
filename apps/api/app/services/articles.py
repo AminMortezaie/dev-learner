@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.ai import quiz as ai_quiz
 from app.models import Article, Language, Quiz, QuizQuestion
-from app.schemas import ArticleOut, iso
+from app.schemas import ArticleOut, ExpandArticleQuizIn, iso
+
+MAX_QUIZ_QUESTIONS = 50
 
 
 def _serialize_article(db: Session, row: dict) -> ArticleOut:
@@ -161,6 +163,10 @@ def get_article_quiz(db: Session, article_id: int) -> dict:
     quiz = db.scalar(select(Quiz).where(Quiz.article_id == article_id))
     if not quiz:
         raise LookupError("No quiz for this article")
+    return _serialize_quiz(db, quiz)
+
+
+def _serialize_quiz(db: Session, quiz: Quiz) -> dict:
     questions = db.scalars(
         select(QuizQuestion)
         .where(QuizQuestion.quiz_id == quiz.id)
@@ -188,3 +194,52 @@ def get_article_quiz(db: Session, article_id: int) -> dict:
             for q in questions
         ],
     }
+
+
+def expand_article_quiz(db: Session, article_id: int, additional_count: int) -> dict:
+    article = db.get(Article, article_id)
+    if not article:
+        raise LookupError("Article not found")
+
+    quiz = db.scalar(select(Quiz).where(Quiz.article_id == article_id))
+    if not quiz:
+        raise LookupError("No quiz for this article")
+
+    existing = db.scalars(
+        select(QuizQuestion)
+        .where(QuizQuestion.quiz_id == quiz.id)
+        .order_by(QuizQuestion.order_index, QuizQuestion.id)
+    ).all()
+    if len(existing) >= MAX_QUIZ_QUESTIONS:
+        raise ValueError(f"Quiz already has the maximum of {MAX_QUIZ_QUESTIONS} questions")
+
+    to_add = min(additional_count, MAX_QUIZ_QUESTIONS - len(existing))
+    language_name: str | None = None
+    if article.language_id:
+        language_name = db.scalar(select(Language.name).where(Language.id == article.language_id))
+
+    new_questions = ai_quiz.generate_quiz_from_article(
+        title=article.title,
+        content=article.content,
+        language=language_name,
+        count=to_add,
+        exclude={q.question for q in existing},
+    )
+    if not new_questions:
+        raise ValueError("Could not generate additional unique questions from this article")
+
+    start_index = len(existing)
+    for offset, q in enumerate(new_questions):
+        db.add(
+            QuizQuestion(
+                quiz_id=quiz.id,
+                question=q.question,
+                options=q.options,
+                correct_answer=q.correct_answer,
+                explanation=q.explanation,
+                order_index=start_index + offset,
+            )
+        )
+
+    db.commit()
+    return _serialize_quiz(db, quiz)

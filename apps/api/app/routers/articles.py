@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.schemas import ArticleIn, ArticleOut, PolishIn, PolishOut
+from app.schemas import ArticleIn, ArticleOut, ExpandArticleQuizIn, PolishIn, PolishOut
 from app.services import articles as articles_service
 
 router = APIRouter(tags=["articles"])
@@ -68,3 +68,17 @@ def get_article_quiz(article_id: int, db: Session = Depends(get_db)) -> dict:
         return articles_service.get_article_quiz(db, article_id)
     except LookupError as err:
         raise HTTPException(404, str(err)) from err
+
+
+@router.post("/articles/{article_id}/quiz/questions")
+def expand_article_quiz(
+    article_id: int,
+    body: ExpandArticleQuizIn,
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        return articles_service.expand_article_quiz(db, article_id, body.additional_count)
+    except LookupError as err:
+        raise HTTPException(404, str(err)) from err
+    except ValueError as err:
+        raise HTTPException(400, str(err)) from err

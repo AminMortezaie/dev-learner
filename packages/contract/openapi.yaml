@@ -309,6 +309,35 @@ paths:
         "404":
           description: Article not found
 
+  /articles/{id}/quiz/questions:
+    post:
+      operationId: expandArticleQuiz
+      tags: [articles]
+      summary: Add more questions to an article quiz
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpandArticleQuizInput"
+      responses:
+        "200":
+          description: Quiz with additional questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+        "400":
+          description: Invalid request or quiz at maximum size
+        "404":
+          description: Article or quiz not found
+
   /quizzes:
     get:
       operationId: listQuizzes
@@ -702,8 +731,8 @@ components:
         quizCount:
           type: integer
           minimum: 1
-          maximum: 20
-          description: Number of quiz questions to auto-generate (default 10)
+          maximum: 50
+          description: Number of quiz questions to auto-generate (default 5)
 
     PolishContentInput:
       type: object
@@ -719,6 +748,16 @@ components:
       properties:
         content:
           type: string
+
+    ExpandArticleQuizInput:
+      type: object
+      properties:
+        additionalCount:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+          description: Number of new questions to add (max 50 total per quiz)
 
     Quiz:
       type: object

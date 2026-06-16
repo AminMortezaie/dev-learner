@@ -23,6 +23,7 @@ import type {
   Article,
   ArticleInput,
   DashboardStats,
+  ExpandArticleQuizInput,
   HealthStatus,
   Language,
   LanguageProgress,
@@ -1195,6 +1196,78 @@ export function useGetArticleQuiz<TData = Awaited<ReturnType<typeof getArticleQu
 
 
 
+
+export const getExpandArticleQuizUrl = (id: number,) => {
+
+
+
+
+  return `/api/articles/${id}/quiz/questions`
+}
+
+/**
+ * @summary Add more questions to an article quiz
+ */
+export const expandArticleQuiz = async (id: number,
+    expandArticleQuizInput: ExpandArticleQuizInput, options?: RequestInit): Promise<Quiz> => {
+
+  return customFetch<Quiz>(getExpandArticleQuizUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      expandArticleQuizInput,)
+  }
+);}
+
+
+
+
+export const getExpandArticleQuizMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof expandArticleQuiz>>, TError,{id: number;data: BodyType<ExpandArticleQuizInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof expandArticleQuiz>>, TError,{id: number;data: BodyType<ExpandArticleQuizInput>}, TContext> => {
+
+const mutationKey = ['expandArticleQuiz'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof expandArticleQuiz>>, {id: number;data: BodyType<ExpandArticleQuizInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  expandArticleQuiz(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExpandArticleQuizMutationResult = NonNullable<Awaited<ReturnType<typeof expandArticleQuiz>>>
+    export type ExpandArticleQuizMutationBody = BodyType<ExpandArticleQuizInput>
+    export type ExpandArticleQuizMutationError = ErrorType<void>
+
+    /**
+ * @summary Add more questions to an article quiz
+ */
+export const useExpandArticleQuiz = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof expandArticleQuiz>>, TError,{id: number;data: BodyType<ExpandArticleQuizInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof expandArticleQuiz>>,
+        TError,
+        {id: number;data: BodyType<ExpandArticleQuizInput>},
+        TContext
+      > => {
+      return useMutation(getExpandArticleQuizMutationOptions(options));
+    }
 
 export const getListQuizzesUrl = (params?: ListQuizzesParams,) => {
   const normalizedParams = new URLSearchParams();

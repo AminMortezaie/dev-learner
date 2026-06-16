@@ -32,7 +32,7 @@ const articleSchema = z.object({
   content: z.string().min(1, "Content is required"),
   languageId: z.coerce.number().optional(),
   tags: z.string().optional(),
-  quizCount: z.coerce.number().int().min(1).max(20).optional(),
+  quizCount: z.coerce.number().int().min(1).max(50).optional(),
 });
 
 export default function Articles() {
@@ -172,7 +172,7 @@ export default function Articles() {
                       <FormItem>
                         <FormLabel>Quiz Questions</FormLabel>
                         <FormControl>
-                          <Input type="number" min={1} max={20} {...field} />
+                          <Input type="number" min={1} max={50} {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

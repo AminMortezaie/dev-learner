@@ -1,14 +1,18 @@
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetArticle,
   useGetArticleQuiz,
+  useExpandArticleQuiz,
   getGetArticleQueryKey,
   getGetArticleQuizQueryKey,
 } from "@devlearn/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { BrainCircuit, Calendar, Tag, Volume2, Pause, Square } from "lucide-react";
+import { BrainCircuit, Calendar, Tag, Volume2, Pause, Square, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { renderMarkdown } from "./markdown";
 import { useArticleTts } from "./use-article-tts";
@@ -17,15 +21,30 @@ export default function ArticleView() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [additionalCount, setAdditionalCount] = useState(5);
 
   const articleId = parseInt(id!);
   const { data: article, isLoading } = useGetArticle(articleId, {
     query: { queryKey: getGetArticleQueryKey(articleId), enabled: !!id },
   });
 
+  const { data: quiz, isLoading: isQuizLoading } = useGetArticleQuiz(articleId, {
+    query: {
+      queryKey: getGetArticleQuizQueryKey(articleId),
+      enabled: !!id && !!article?.hasQuiz,
+    },
+  });
+
   const getQuiz = useGetArticleQuiz(articleId, {
     query: { queryKey: getGetArticleQuizQueryKey(articleId), enabled: false },
   });
+
+  const expandQuiz = useExpandArticleQuiz();
+
+  const maxQuizQuestions = 50;
+  const currentQuestionCount = quiz?.questionCount ?? quiz?.questions?.length ?? 0;
+  const canAddQuestions = article?.hasQuiz && currentQuestionCount < maxQuizQuestions;
 
   const {
     ttsState,
@@ -39,14 +58,38 @@ export default function ArticleView() {
 
   const handleGenerateQuiz = async () => {
     try {
-      const quiz = await getQuiz.refetch();
-      if (quiz.data) {
+      const result = await getQuiz.refetch();
+      if (result.data) {
         toast({ title: "Quiz ready!" });
-        setLocation(`/quizzes/${quiz.data.id}`);
+        setLocation(`/quizzes/${result.data.id}`);
       }
     } catch {
       toast({ title: "Failed to generate quiz", variant: "destructive" });
     }
+  };
+
+  const handleAddQuestions = () => {
+    const count = Math.min(
+      Math.max(1, additionalCount),
+      maxQuizQuestions - currentQuestionCount,
+      20,
+    );
+
+    expandQuiz.mutate(
+      { id: articleId, data: { additionalCount: count } },
+      {
+        onSuccess: (data) => {
+          queryClient.setQueryData(getGetArticleQuizQueryKey(articleId), data);
+          toast({
+            title: `Added ${count} question${count === 1 ? "" : "s"}`,
+            description: `This quiz now has ${data.questionCount ?? data.questions?.length ?? 0} questions.`,
+          });
+        },
+        onError: () => {
+          toast({ title: "Failed to add questions", variant: "destructive" });
+        },
+      },
+    );
   };
 
   if (isLoading) {
@@ -178,22 +221,70 @@ export default function ArticleView() {
       <div className="mt-16 p-4 md:p-8 border border-border bg-card/50 rounded-xl text-center">
         <h3 className="text-xl font-bold mb-2">Test Your Knowledge</h3>
         <p className="text-muted-foreground mb-6">
-          Generate an interactive quiz based on the contents of this article to reinforce your learning.
+          {article.hasQuiz
+            ? "Take the quiz for this article or add more questions to practice."
+            : "Generate an interactive quiz based on the contents of this article to reinforce your learning."}
         </p>
-        <Button
-          onClick={handleGenerateQuiz}
-          disabled={getQuiz.isFetching}
-          className="font-mono font-bold"
-          size="lg"
-        >
-          {getQuiz.isFetching ? (
-            "Generating Quiz..."
-          ) : (
-            <>
-              <BrainCircuit className="mr-2 h-5 w-5" /> {article.hasQuiz ? "Go to Quiz" : "Generate Quiz"}
-            </>
+
+        {article.hasQuiz && (
+          <p className="text-sm font-mono text-muted-foreground mb-4">
+            {isQuizLoading
+              ? "Loading quiz..."
+              : `${currentQuestionCount} question${currentQuestionCount === 1 ? "" : "s"} in this quiz`}
+          </p>
+        )}
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Button
+            onClick={handleGenerateQuiz}
+            disabled={getQuiz.isFetching || !article.hasQuiz}
+            className="font-mono font-bold w-full sm:w-auto"
+            size="lg"
+          >
+            {getQuiz.isFetching ? (
+              "Opening Quiz..."
+            ) : (
+              <>
+                <BrainCircuit className="mr-2 h-5 w-5" /> {article.hasQuiz ? "Go to Quiz" : "Generate Quiz"}
+              </>
+            )}
+          </Button>
+
+          {canAddQuestions && (
+            <div className="flex w-full sm:w-auto items-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={Math.min(20, maxQuizQuestions - currentQuestionCount)}
+                value={additionalCount}
+                onChange={(e) => setAdditionalCount(Number(e.target.value) || 1)}
+                className="w-20 font-mono text-center"
+                aria-label="Number of questions to add"
+              />
+              <Button
+                variant="outline"
+                onClick={handleAddQuestions}
+                disabled={expandQuiz.isPending}
+                className="font-mono font-bold flex-1 sm:flex-none"
+                size="lg"
+              >
+                {expandQuiz.isPending ? (
+                  "Adding..."
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-5 w-5" /> Add Questions
+                  </>
+                )}
+              </Button>
+            </div>
           )}
-        </Button>
+        </div>
+
+        {article.hasQuiz && !canAddQuestions && !isQuizLoading && (
+          <p className="text-xs text-muted-foreground mt-4 font-mono">
+            This quiz has reached the maximum of {maxQuizQuestions} questions.
+          </p>
+        )}
       </div>
     </div>
   );
