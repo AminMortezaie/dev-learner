@@ -54,7 +54,7 @@ export default function Articles() {
 
   const form = useForm<z.infer<typeof articleSchema>>({
     resolver: zodResolver(articleSchema),
-    defaultValues: { title: "", summary: "", content: "", tags: "", quizCount: 10 },
+    defaultValues: { title: "", summary: "", content: "", tags: "", quizCount: 5 },
   });
 
   const onSubmit = (data: z.infer<typeof articleSchema>) => {
@@ -64,7 +64,7 @@ export default function Articles() {
       summary: data.summary,
       tags: data.tags,
       languageId: data.languageId ?? null,
-      quizCount: data.quizCount ?? 10,
+      quizCount: data.quizCount ?? 5,
     };
     createArticle.mutate(
       { data: payload },

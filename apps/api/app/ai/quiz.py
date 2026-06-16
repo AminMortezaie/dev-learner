@@ -10,8 +10,29 @@ import httpx
 
 from app.config import settings
 
-DEFAULT_COUNT = 10
-POLISH_CHUNK = 6000
+DEFAULT_COUNT = settings.ai_quiz_default_count
+
+
+def _normalize_for_ai(text: str, max_chars: int) -> str:
+    collapsed = re.sub(r"\n{3,}", "\n\n", text.strip())
+    collapsed = re.sub(r"[ \t]+", " ", collapsed)
+    if len(collapsed) <= max_chars:
+        return collapsed
+    cut = collapsed[:max_chars]
+    last_para = cut.rfind("\n\n")
+    if last_para > max_chars // 2:
+        return cut[:last_para].strip()
+    return cut.rstrip()
+
+
+def _quiz_output_tokens(count: int) -> int:
+    estimated = count * 200 + 256
+    return min(estimated, settings.ai_quiz_max_output_tokens)
+
+
+def _polish_output_tokens(chunk_len: int) -> int:
+    estimated = chunk_len // 2 + 256
+    return min(max(estimated, 512), settings.ai_polish_max_output_tokens)
 
 
 @dataclass
@@ -70,27 +91,24 @@ def polish_content(raw_text: str) -> str:
         raise RuntimeError("AI_API_KEY is required for content polishing")
 
     system = (
-        "You are a technical writing editor. Reformat the given raw text as clean Markdown. "
-        "STRICT RULES: "
-        "1. Output ONLY the reformatted input text — nothing else. "
-        "2. Do NOT add introductions, conclusions, summaries, closing remarks, or any text not present in the input. "
-        "3. Do NOT omit or summarize any part of the input. "
-        "4. Only restructure: add ## headings, bullet lists, numbered lists, code blocks with language hints, **bold** for key terms. "
-        "5. Output raw Markdown text only — no JSON, no fences around the whole response, no commentary."
+        "Reformat raw text as clean Markdown only. "
+        "Do not add, remove, or summarize content — only restructure with headings, lists, "
+        "code blocks, and bold. No commentary or wrapping fences."
     )
 
-    chunks = [raw_text[i : i + POLISH_CHUNK] for i in range(0, len(raw_text), POLISH_CHUNK)]
+    chunk_size = settings.ai_polish_chunk_chars
+    chunks = [raw_text[i : i + chunk_size] for i in range(0, len(raw_text), chunk_size)]
     polished: list[str] = []
     for idx, chunk in enumerate(chunks):
         user = (
-            f"Polish part {idx + 1} of {len(chunks)}:\n\n{chunk}"
+            f"Part {idx + 1}/{len(chunks)}:\n\n{chunk}"
             if len(chunks) > 1
-            else f"Polish the following content:\n\n{chunk}"
+            else chunk
         )
         result = _ai_chat(
             cfg,
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            max_tokens=4096,
+            max_tokens=_polish_output_tokens(len(chunk)),
             json_mode=False,
         )
         polished.append(result.strip())
@@ -122,24 +140,21 @@ def _generate_quiz_with_ai(
     count: int,
     cfg: dict[str, str],
 ) -> list[GeneratedQuestion]:
-    lang_hint = f" The article is about {language}." if language else ""
-    system = (
-        "You are an expert technical educator creating quizzes for senior software engineers. "
-        "You output ONLY valid JSON matching the requested schema. Do not include prose, "
-        "markdown fences, or commentary. Questions must test deep understanding, not trivia."
-    )
-    snippet = content[:6000]
+    lang_hint = f" Topic: {language}." if language else ""
+    system = "Output only valid JSON. Create deep multiple-choice questions, not trivia."
+    snippet = _normalize_for_ai(content, settings.ai_quiz_article_chars)
     user = (
-        f"Generate exactly {count} multiple-choice questions from the article below.{lang_hint} "
-        "Requirements:\n"
-        "- Each question has exactly 4 plausible options.\n"
-        "- 'correctAnswer' is the 0-based index of the correct option.\n"
-        "- Include a 1–2 sentence 'explanation' grounded in the article.\n"
-        "- Avoid yes/no questions. Prefer 'why', 'when', and 'which is most accurate' framings.\n"
-        f'\nReturn JSON: {{"questions":[{{"question":string,"options":[string,string,string,string],"correctAnswer":number,"explanation":string}}]}}\n'
-        f"\n=== ARTICLE: {title} ===\n{snippet}\n=== END ARTICLE ==="
+        f"Generate {count} MCQs from the article.{lang_hint} "
+        "4 options each, correctAnswer is 0-based index, 1-sentence explanation.\n"
+        f'JSON: {{"questions":[{{"question":string,"options":[string,string,string,string],'
+        f'"correctAnswer":number,"explanation":string}}]}}\n'
+        f"=== {title} ===\n{snippet}"
     )
-    raw = _ai_chat(cfg, [{"role": "system", "content": system}, {"role": "user", "content": user}], 3072)
+    raw = _ai_chat(
+        cfg,
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        _quiz_output_tokens(count),
+    )
     parsed = json.loads(raw)
     return _validate_questions(parsed.get("questions"), count)
 
