@@ -56,8 +56,9 @@ export default function QuizView() {
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
   const handleSelectAnswer = (optionIndex: number) => {
-    if (submitted) return;
+    if (submitted || answers[currentQuestion.id] !== undefined) return;
     setAnswers({ ...answers, [currentQuestion.id]: optionIndex });
+    setShowHint(false);
   };
 
   const handleNext = () => {
@@ -179,6 +180,26 @@ export default function QuizView() {
   }
 
   const isAnswered = answers[currentQuestion.id] !== undefined;
+  const userAnswer = answers[currentQuestion.id];
+  const correctAnswer = currentQuestion.correctAnswer;
+  const isCorrect = isAnswered && userAnswer === correctAnswer;
+
+  const getOptionClassName = (optionIndex: number) => {
+    if (!isAnswered) {
+      return "border-border bg-background hover:border-primary/50 hover:bg-muted/50";
+    }
+
+    const isSelected = userAnswer === optionIndex;
+    const isCorrectOption = correctAnswer === optionIndex;
+
+    if (isCorrectOption) {
+      return "border-green-500/50 bg-green-500/20 text-green-600 dark:text-green-400";
+    }
+    if (isSelected) {
+      return "border-destructive/50 bg-destructive/20 text-destructive";
+    }
+    return "border-border bg-muted/30 text-muted-foreground opacity-70";
+  };
 
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
@@ -194,7 +215,7 @@ export default function QuizView() {
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-xl leading-relaxed">{currentQuestion.question}</CardTitle>
-            {currentQuestion.explanation && (
+            {currentQuestion.explanation && !isAnswered && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -205,10 +226,32 @@ export default function QuizView() {
                 {showHint ? "Hide hint" : "Hint"}
               </Button>
             )}
+            {isAnswered && (
+              <Badge
+                variant={isCorrect ? "default" : "destructive"}
+                className={`shrink-0 font-mono text-xs ${isCorrect ? "bg-green-600 hover:bg-green-600" : ""}`}
+              >
+                {isCorrect ? (
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> Correct
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <XCircle className="h-3 w-3" /> Incorrect
+                  </span>
+                )}
+              </Badge>
+            )}
           </div>
-          {showHint && currentQuestion.explanation && (
+          {showHint && !isAnswered && currentQuestion.explanation && (
             <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm text-yellow-900 dark:text-yellow-200 animate-in fade-in duration-200">
               <strong className="font-mono text-xs text-yellow-700 dark:text-yellow-500 mb-1 block">HINT</strong>
+              {currentQuestion.explanation}
+            </div>
+          )}
+          {isAnswered && currentQuestion.explanation && (
+            <div className="mt-2 p-3 bg-muted/30 rounded-lg text-sm border border-border/50 animate-in fade-in duration-200">
+              <strong className="font-mono text-xs text-muted-foreground mb-1 block">EXPLANATION</strong>
               {currentQuestion.explanation}
             </div>
           )}
@@ -217,14 +260,22 @@ export default function QuizView() {
           {currentQuestion.options.map((opt, idx) => (
             <button
               key={idx}
+              type="button"
               onClick={() => handleSelectAnswer(idx)}
-              className={`w-full text-left p-4 rounded-lg border transition-all ${
-                answers[currentQuestion.id] === idx
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-background hover:border-primary/50 hover:bg-muted/50"
+              disabled={isAnswered}
+              className={`w-full text-left p-4 rounded-lg border transition-all ${getOptionClassName(idx)} ${
+                isAnswered ? "cursor-default" : "cursor-pointer"
               }`}
             >
-              {opt}
+              <span className="flex items-center justify-between gap-3">
+                <span>{opt}</span>
+                {isAnswered && correctAnswer === idx && (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+                )}
+                {isAnswered && userAnswer === idx && correctAnswer !== idx && (
+                  <XCircle className="h-4 w-4 shrink-0 text-destructive" />
+                )}
+              </span>
             </button>
           ))}
         </CardContent>
